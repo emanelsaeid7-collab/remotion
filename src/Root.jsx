@@ -109,7 +109,16 @@ const AUTOMATION_DATA = {
 export const RemotionRoot = () => {
   return (
     <>
-      <Composition id="FixVideo" component={MasterTemplate} durationInFrames={1800} fps={30} width={1080} height={1920} defaultProps={{ videoData: FIX_DATA }} />
+      <Composition
+  id="FixVideo"
+  component={MasterTemplate}
+  durationInFrames={1800}
+  calculateMetadata={async ({ props }) => {
+    const total = props.videoData?.totalDurationFrames || 1800;
+    return { durationInFrames: total };
+  }}
+  ...
+/>
       <Composition id="ErrorVideo" component={MasterTemplate} durationInFrames={getTotalDuration(ERROR_DATA)} fps={30} width={1080} height={1920} defaultProps={{ videoData: ERROR_DATA }} />
       <Composition id="ComparisonVideo" component={MasterTemplate} durationInFrames={getTotalDuration(COMPARISON_DATA)} fps={30} width={1080} height={1920} defaultProps={{ videoData: COMPARISON_DATA }} />
       <Composition id="WorkflowVideo" component={MasterTemplate} durationInFrames={getTotalDuration(WORKFLOW_DATA)} fps={30} width={1080} height={1920} defaultProps={{ videoData: WORKFLOW_DATA }} />
