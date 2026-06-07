@@ -181,6 +181,11 @@ export const getTotalDuration = (data) => {
     // نضيف الـ visualOffset على المدة الكلية لضمان عدم قطع نهاية الفيديو
     const scenesDurationSec = lastTiming.end + visualOffset; 
     const scenesDurationFrames = Math.round(scenesDurationSec * FPS);
+
+    console.log("--- DIAGNOSTIC LOG ---");
+console.log("sceneTimings length received:", sceneTimings.length);
+console.log("scenes length received:", scenes.length);
+console.log("----------------------");
     
     return scenesDurationFrames + ctaFrames;
   }
