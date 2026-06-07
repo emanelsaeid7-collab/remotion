@@ -1,5 +1,5 @@
 import React from 'react';
-import { AbsoluteFill, Series, Audio } from 'remotion';
+import { AbsoluteFill, Series } from 'remotion';
 
 import { HookSection }                           from './sections/HookSection';
 import { ProblemSection }                        from './sections/ProblemSection';
@@ -8,14 +8,13 @@ import { ComparisonSection, WinnerSection }      from './sections/ComparisonSect
 import { WorkflowOverview, WorkflowStepSection } from './sections/WorkflowSection';
 import { CTASection }                            from './sections/CTASection';
 
-// Default durations (fallback only — overridden by server-calculated values)
-const DEFAULT_HOOK_FRAMES     = 150; // 5s
-const DEFAULT_CTA_FRAMES      = 150; // 5s
-const DEFAULT_CONTENT_FRAMES  = 540; // 18s
 const FPS = 30;
 
-const buildSections = (data, hookDur, contentDur, ctaDur) => {
-  const steps = data.steps || [];
+const buildSections = (data) => {
+  const totalFrames  = data.totalDurationFrames || 900;
+  const ctaFrames    = data.ctaDurFrames        || 150;
+  const contentFrames = totalFrames - ctaFrames;
+  const steps        = data.steps || [];
 
   switch (data.videoType) {
     case 'fix':
@@ -23,66 +22,44 @@ const buildSections = (data, hookDur, contentDur, ctaDur) => {
     case 'productivity':
     case 'freelancing':
       return [
-        { component: <HookSection data={data} />,     duration: hookDur },
-        { component: <ProblemSection data={data} />,  duration: Math.floor(contentDur * 0.35) },
-        { component: <SolutionSection data={data} />, duration: Math.floor(contentDur * 0.65) },
-        { component: <CTASection data={data} />,      duration: ctaDur },
+        { component: <ProblemSection data={data} />,  duration: Math.floor(contentFrames * 0.4) },
+        { component: <SolutionSection data={data} />, duration: Math.floor(contentFrames * 0.6) },
+        { component: <CTASection data={data} />,      duration: ctaFrames },
       ];
 
     case 'comparison':
       return [
-        { component: <HookSection data={data} />,       duration: hookDur },
-        { component: <ComparisonSection data={data} />, duration: Math.floor(contentDur * 0.65) },
-        { component: <WinnerSection data={data} />,     duration: Math.floor(contentDur * 0.35) },
-        { component: <CTASection data={data} />,        duration: ctaDur },
+        { component: <ComparisonSection data={data} />, duration: Math.floor(contentFrames * 0.65) },
+        { component: <WinnerSection data={data} />,     duration: Math.floor(contentFrames * 0.35) },
+        { component: <CTASection data={data} />,        duration: ctaFrames },
       ];
 
     case 'workflow':
     case 'automation':
-      const perStep = steps.length > 0 ? Math.floor(contentDur / (steps.length + 1)) : contentDur;
+      const perStep = Math.floor(contentFrames / (steps.length + 1));
       return [
-        { component: <HookSection data={data} />,      duration: hookDur },
         { component: <WorkflowOverview data={data} />, duration: perStep },
         ...steps.map((_, i) => ({
           component: <WorkflowStepSection data={data} stepIndex={i} />,
           duration: perStep,
         })),
-        { component: <CTASection data={data} />, duration: ctaDur },
+        { component: <CTASection data={data} />, duration: ctaFrames },
       ];
 
     default:
       return [
-        { component: <HookSection data={data} />, duration: hookDur },
-        { component: <CTASection data={data} />,  duration: ctaDur },
+        { component: <HookSection data={data} />, duration: contentFrames },
+        { component: <CTASection data={data} />,  duration: ctaFrames },
       ];
   }
 };
 
 export const MasterTemplate = ({ videoData }) => {
-  const data = videoData || { videoType: 'fix', title: 'Example', problem: '...', solution: [] };
-
-  // ── Use server-calculated durations if available ──────────────────────────
-  const hookDur    = data.hookDurFrames    || DEFAULT_HOOK_FRAMES;
-  const ctaDur     = data.ctaDurFrames     || DEFAULT_CTA_FRAMES;
-  const totalDur   = data.totalDurationFrames || (DEFAULT_HOOK_FRAMES + DEFAULT_CONTENT_FRAMES + DEFAULT_CTA_FRAMES);
-  const contentDur = totalDur - hookDur - ctaDur;
-
-  const sections = buildSections(data, hookDur, contentDur, ctaDur);
+  const data     = videoData || { videoType: 'fix', title: 'Example', problem: '...', solution: [] };
+  const sections = buildSections(data);
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#0f172a', color: 'white' }}>
-      {/* Audio starts after Hook section ends */}
-      {data.audioUrl && (
-        <Series>
-          <Series.Sequence durationInFrames={hookDur}>
-            {/* silence during hook */}
-            <></>
-          </Series.Sequence>
-          <Series.Sequence durationInFrames={contentDur + ctaDur}>
-            <Audio src={data.audioUrl} />
-          </Series.Sequence>
-        </Series>
-      )}
       <Series>
         {sections.map((sec, i) => (
           <Series.Sequence key={i} durationInFrames={sec.duration}>
@@ -94,15 +71,14 @@ export const MasterTemplate = ({ videoData }) => {
   );
 };
 
-// For Root.jsx preview — uses defaults
 export const getTotalDuration = (data) => {
-  if (!data) return DEFAULT_HOOK_FRAMES + DEFAULT_CONTENT_FRAMES + DEFAULT_CTA_FRAMES;
+  if (!data) return 900;
   const steps = data.steps || [];
   switch (data.videoType) {
     case 'workflow':
     case 'automation':
-      return DEFAULT_HOOK_FRAMES + (steps.length + 1) * 150 + DEFAULT_CTA_FRAMES;
+      return (steps.length + 1) * 150 + 150;
     default:
-      return DEFAULT_HOOK_FRAMES + DEFAULT_CONTENT_FRAMES + DEFAULT_CTA_FRAMES;
+      return 900;
   }
 };
