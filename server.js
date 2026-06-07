@@ -42,6 +42,9 @@ app.post('/render', async (req, res) => {
     try {
       fs.writeFileSync(audioFile, Buffer.from(audio.base64, 'base64'));
       hasAudio = true;
+      const stats = fs.statSync(audioFile);
+console.log(`[audio] file size: ${stats.size} bytes`);
+      
       console.log(`[audio] ✅ Saved`);
     } catch (e) {
       console.error(`[audio] ❌`, e.message);
