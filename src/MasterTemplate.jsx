@@ -1,62 +1,145 @@
 import React from 'react';
-import { AbsoluteFill, Series } from 'remotion';
-
-import { HookSection }                           from './sections/HookSection';
-import { ProblemSection }                        from './sections/ProblemSection';
-import { SolutionSection }                       from './sections/SolutionSection';
-import { ComparisonSection, WinnerSection }      from './sections/ComparisonSection';
-import { WorkflowOverview, WorkflowStepSection } from './sections/WorkflowSection';
-import { CTASection }                            from './sections/CTASection';
+import { AbsoluteFill, Series, useCurrentFrame, interpolate } from 'remotion';
+import { CTASection } from './sections/CTASection';
+import { COLORS } from './styles';
 
 const FPS = 30;
 
-const buildSections = (data) => {
-  const totalFrames  = data.totalDurationFrames || 900;
-  const ctaFrames    = data.ctaDurFrames        || 150;
-  const contentFrames = totalFrames - ctaFrames;
-  const steps        = data.steps || [];
+// ── Single Scene Renderer ─────────────────────────────────────────────────────
+const SceneSlide = ({ scene, index, total }) => {
+  const frame = useCurrentFrame();
+  const progress = interpolate(frame, [0, 15], [0, 1], {
+    extrapolateLeft: 'clamp', extrapolateRight: 'clamp',
+  });
+  const fadeOut = interpolate(frame, [0, 8], [0, 1], {
+    extrapolateLeft: 'clamp', extrapolateRight: 'clamp',
+  });
 
-  switch (data.videoType) {
-    case 'fix':
-    case 'error':
-    case 'productivity':
-    case 'freelancing':
-      return [
-        { component: <ProblemSection data={data} />,  duration: Math.floor(contentFrames * 0.4) },
-        { component: <SolutionSection data={data} />, duration: Math.floor(contentFrames * 0.6) },
-        { component: <CTASection data={data} />,      duration: ctaFrames },
-      ];
+  const colors = ['#6C63FF', '#43E97B', '#38F9D7', '#FF6584', '#FFB347'];
+  const accent = colors[index % colors.length];
 
-    case 'comparison':
-      return [
-        { component: <ComparisonSection data={data} />, duration: Math.floor(contentFrames * 0.65) },
-        { component: <WinnerSection data={data} />,     duration: Math.floor(contentFrames * 0.35) },
-        { component: <CTASection data={data} />,        duration: ctaFrames },
-      ];
+  return (
+    <AbsoluteFill style={{
+      backgroundColor: COLORS.bg || '#0f172a',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: '80px 60px',
+      flexDirection: 'column',
+      gap: 32,
+    }}>
+      {/* Background glow */}
+      <div style={{
+        position: 'absolute',
+        top: '20%', left: '10%',
+        width: 500, height: 500,
+        borderRadius: '50%',
+        background: `radial-gradient(circle, ${accent}18 0%, transparent 70%)`,
+        opacity: fadeOut,
+      }} />
 
-    case 'workflow':
-    case 'automation':
-      const perStep = Math.floor(contentFrames / (steps.length + 1));
-      return [
-        { component: <WorkflowOverview data={data} />, duration: perStep },
-        ...steps.map((_, i) => ({
-          component: <WorkflowStepSection data={data} stepIndex={i} />,
-          duration: perStep,
-        })),
-        { component: <CTASection data={data} />, duration: ctaFrames },
-      ];
+      {/* Scene number */}
+      <div style={{
+        opacity: progress,
+        transform: `scale(${0.8 + 0.2 * progress})`,
+        background: `${accent}22`,
+        border: `1px solid ${accent}66`,
+        color: accent,
+        padding: '8px 24px',
+        borderRadius: 100,
+        fontSize: 18,
+        fontWeight: 700,
+        letterSpacing: 2,
+        zIndex: 10,
+      }}>
+        {index + 1} / {total}
+      </div>
 
-    default:
-      return [
-        { component: <HookSection data={data} />, duration: contentFrames },
-        { component: <CTASection data={data} />,  duration: ctaFrames },
-      ];
-  }
+      {/* Scene text */}
+      <div style={{
+        opacity: progress,
+        transform: `translateY(${(1 - progress) * 40}px)`,
+        fontSize: 52,
+        fontWeight: 800,
+        color: '#FFFFFF',
+        textAlign: 'center',
+        lineHeight: 1.3,
+        zIndex: 10,
+        fontFamily: '"Inter", "Segoe UI", sans-serif',
+        textShadow: `0 0 40px ${accent}44`,
+        maxWidth: 900,
+      }}>
+        {scene.title || scene.text || ''}
+      </div>
+
+      {/* Search terms as subtle tags */}
+      {scene.detail && (
+        <div style={{
+          opacity: progress * 0.5,
+          display: 'flex',
+          gap: 10,
+          flexWrap: 'wrap',
+          justifyContent: 'center',
+          zIndex: 10,
+        }}>
+          {scene.detail.split(',').map((tag, i) => (
+            <span key={i} style={{
+              fontSize: 14,
+              color: accent,
+              background: `${accent}15`,
+              padding: '4px 12px',
+              borderRadius: 100,
+            }}>
+              {tag.trim()}
+            </span>
+          ))}
+        </div>
+      )}
+    </AbsoluteFill>
+  );
 };
 
+// ── Master Template ───────────────────────────────────────────────────────────
 export const MasterTemplate = ({ videoData }) => {
-  const data     = videoData || { videoType: 'fix', title: 'Example', problem: '...', solution: [] };
-  const sections = buildSections(data);
+  const data = videoData || { videoType: 'fix', title: 'Example', solution: [] };
+
+  const sceneTimings = data.sceneTimings || [];
+  const scenes       = data.solution     || [];
+  const ctaFrames    = data.ctaDurFrames || 150;
+
+  // ── Build sections from sceneTimings ──────────────────────────────────────
+  let sections = [];
+
+  if (sceneTimings.length > 0 && scenes.length > 0) {
+    // Each scene duration comes from sceneTimings
+    sceneTimings.forEach((timing, i) => {
+      const scene    = scenes[i] || scenes[scenes.length - 1];
+      const durSec   = timing.end - timing.start;
+      const durFrames = Math.max(Math.ceil(durSec * FPS), 1);
+
+      sections.push({
+        component: <SceneSlide scene={scene} index={i} total={sceneTimings.length} />,
+        duration: durFrames,
+      });
+    });
+  } else {
+    // Fallback: divide equally
+    const totalFrames   = data.totalDurationFrames || 900;
+    const contentFrames = totalFrames - ctaFrames;
+    const perScene      = Math.floor(contentFrames / Math.max(scenes.length, 1));
+
+    scenes.forEach((scene, i) => {
+      sections.push({
+        component: <SceneSlide scene={scene} index={i} total={scenes.length} />,
+        duration: perScene,
+      });
+    });
+  }
+
+  // Add CTA at the end
+  sections.push({
+    component: <CTASection data={data} />,
+    duration: ctaFrames,
+  });
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#0f172a', color: 'white' }}>
