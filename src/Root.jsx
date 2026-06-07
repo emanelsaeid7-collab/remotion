@@ -1,5 +1,5 @@
 import React from 'react';
-import { Composition } from 'remotion';
+import { Composition, registerRoot } from 'remotion'; // 👈 1. قمنا بإضافة registerRoot هنا
 import { MasterTemplate, getTotalDuration } from './MasterTemplate';
 
 // Sample data for preview
@@ -83,3 +83,6 @@ export const RemotionRoot = () => {
     </>
   );
 };
+
+// 👈 2. قمنا بإضافة هذا السطر في نهاية الملف لتسجيل الكومبوننت في Remotion
+registerRoot(RemotionRoot);
