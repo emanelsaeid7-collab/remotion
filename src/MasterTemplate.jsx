@@ -103,20 +103,23 @@ export const MasterTemplate = ({ videoData }) => {
   const data = videoData || { videoType: 'fix', title: 'Example', solution: [] };
 
   const sceneTimings = data.sceneTimings || [];
-  
-  // تعديل ذكي: يدعم قراءة scenes أو solution لتفادي مشكلة المسميات الفارغة
-  const scenes       = data.scenes || data.solution || []; 
+  const scenes       = data.scenes || data.solution || [];
   const ctaFrames    = data.ctaDurFrames || 150;
+
+  // 🛠️ مقبض المعايرة (Calibration Knob):
+  // نقوم بتأخير الانتقالات البصرية بمقدار جزئي بالثواني لمنح الصوت وقتاً كافياً لينتهي قبل تبديل النص.
+  // القيمة الافتراضية هنا هي 0.4 ثانية، يمكنك تعديلها إلى 0.3 أو 0.5 أو حتى تمريرها ديناميكياً من n8n باسم visualOffset.
+  const visualOffset = data.visualOffset !== undefined ? data.visualOffset : 0.4;
 
   let sections = [];
 
   if (sceneTimings.length > 0 && scenes.length > 0) {
-    // التموضع المطلق بالاعتماد على توقيتات n8n
     sceneTimings.forEach((timing, i) => {
       const scene = scenes[i] || scenes[scenes.length - 1];
       
-      const startFrame = Math.round(timing.start * FPS);
-      const endFrame = Math.round(timing.end * FPS);
+      // المشهد الأول يبدأ دائماً من الفريم 0، لكننا نؤخر وقت نهايته ونؤخر بدايات ونهايات المشاهد التالية بالـ visualOffset
+      const startFrame = i === 0 ? 0 : Math.round((timing.start + visualOffset) * FPS);
+      const endFrame = Math.round((timing.end + visualOffset) * FPS);
       const durFrames = Math.max(endFrame - startFrame, 1);
 
       sections.push({
@@ -126,7 +129,7 @@ export const MasterTemplate = ({ videoData }) => {
       });
     });
   } else {
-    // خيار الاحتياط فقط في حال لم تتوفر التوقيتات
+    // Fallback
     const totalFrames   = data.totalDurationFrames || 900;
     const contentFrames = totalFrames - ctaFrames;
     const perScene      = Math.floor(contentFrames / Math.max(scenes.length, 1));
@@ -140,7 +143,7 @@ export const MasterTemplate = ({ videoData }) => {
     });
   }
 
-  // إضافة الـ CTA
+  // إضافة الـ CTA في النهاية مباشرة بعد المشهد الأخير المعدل
   let ctaStartFrame = 0;
   if (sections.length > 0) {
     const lastSection = sections[sections.length - 1];
@@ -164,4 +167,30 @@ export const MasterTemplate = ({ videoData }) => {
       ))}
     </AbsoluteFill>
   );
+};
+
+// ── حساب المدة الكلية للفيديو ديناميكياً مع مراعاة الإزاحة ──────────────────────
+export const getTotalDuration = (data) => {
+  if (!data) return 900;
+
+  const ctaFrames = data.ctaDurFrames || 150;
+  const visualOffset = data.visualOffset !== undefined ? data.visualOffset : 0.4;
+
+  if (data.sceneTimings && data.sceneTimings.length > 0) {
+    const lastTiming = data.sceneTimings[data.sceneTimings.length - 1];
+    // نضيف الـ visualOffset على المدة الكلية لضمان عدم قطع نهاية الفيديو
+    const scenesDurationSec = lastTiming.end + visualOffset; 
+    const scenesDurationFrames = Math.round(scenesDurationSec * FPS);
+    
+    return scenesDurationFrames + ctaFrames;
+  }
+
+  const steps = data.steps || [];
+  switch (data.videoType) {
+    case 'workflow':
+    case 'automation':
+      return (steps.length + 1) * 150 + 150;
+    default:
+      return data.totalDurationFrames || 900;
+  }
 };
