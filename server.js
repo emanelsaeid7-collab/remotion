@@ -14,7 +14,6 @@ app.use(express.json({ limit: '50mb' }));
 const OUTPUT_DIR = path.join(__dirname, 'output');
 fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 app.use('/videos', express.static(OUTPUT_DIR));
-app.use('/assets', express.static(path.join(__dirname, 'assets')));
 
 const VIDEO_TYPE_MAP = {
   fix: 'FixVideo', error: 'FixVideo', comparison: 'ComparisonVideo',
@@ -149,9 +148,11 @@ app.post('/render', async (req, res) => {
   finalVideoData.audioDuration = audioDurationSec;
   finalVideoData.totalDurationFrames = totalFrames;
   finalVideoData.ctaDurFrames = Math.ceil(5 * FPS);
-  finalVideoData.logoPath = logoPath ? `/assets/logo.webp` : null;
-  finalVideoData.voiceId = voice_id || 'XN5MUfNpmfCV6rvigVhs'; // Default: Giselle Marie
+  // ✅ Use absolute file path with file:// protocol for Remotion
+  finalVideoData.logoPath = logoPath ? `file://${logoPath}` : null;
+  finalVideoData.voiceId = voice_id || 'XN5MUfNpmfCV6rvigVhs';
 
+  console.log('[props] logoPath:', finalVideoData.logoPath);
   console.log('[props] keys:', Object.keys(finalVideoData));
   fs.writeFileSync(propsFile, JSON.stringify({ videoData: finalVideoData }, null, 2));
 
@@ -220,8 +221,8 @@ app.post('/render', async (req, res) => {
   }
 });
 
-app.get('/health', (_, res) => res.json({ status: 'ok', version: '3.3' }));
-app.get('/', (_, res) => res.json({ service: 'Remotion + FFmpeg + SmartRemoteGigs', version: '3.3' }));
+app.get('/health', (_, res) => res.json({ status: 'ok', version: '3.4' }));
+app.get('/', (_, res) => res.json({ service: 'Remotion + FFmpeg + SmartRemoteGigs', version: '3.4' }));
 
 app.listen(PORT, () => {
   console.log(`🎬 SmartRemoteGigs Video Server → http://localhost:${PORT}`);
