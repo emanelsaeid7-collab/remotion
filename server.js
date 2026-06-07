@@ -18,6 +18,7 @@ const OUTPUT_DIR = path.join(__dirname, 'output');
 fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 app.use('/videos', express.static(OUTPUT_DIR));
 
+// 1. تعريف جميع الأنواع السبعة هنا
 const VIDEO_TYPE_MAP = {
   fix:          'FixVideo',
   error:        'ErrorVideo',
@@ -28,7 +29,12 @@ const VIDEO_TYPE_MAP = {
   automation:   'AutomationVideo',
 };
 
-// ... inside app.post('/render') ...
+// ── POST /render ─────────────────────────────────────────────────────────────
+app.post('/render', async (req, res) => {
+  const videoData = req.body || {};
+  const { videoType } = videoData;
+
+  // 2. التحقق من صحة النوع
   if (!VIDEO_TYPE_MAP[videoType]) {
     return res.status(400).json({
       error: `Invalid videoType. Available types: ${Object.keys(VIDEO_TYPE_MAP).join(' | ')}`,
@@ -50,7 +56,7 @@ const VIDEO_TYPE_MAP = {
   try {
     const cmd = [
       'npx remotion render',
-      'src/Root.jsx',           // <--- تم إضافة نقطة البداية هنا ✅
+      'src/index.jsx',           // <--- نقطة البداية الصحيحة
       compositionId,
       `"${outputFile}"`,
       `--props="${propsFile}"`,
@@ -62,7 +68,6 @@ const VIDEO_TYPE_MAP = {
 
     fs.unlinkSync(propsFile);
 
-    // Build public URL from BASE_URL env var (set in Coolify)
     const baseUrl  = process.env.BASE_URL || `http://localhost:${PORT}`;
     const videoUrl = `${baseUrl}/videos/${filename}`;
 
@@ -75,8 +80,6 @@ const VIDEO_TYPE_MAP = {
     res.status(500).json({ error: err.message });
   }
 });
-
-// ── GET /videos/:file — already served by express.static above ───────────────
 
 // ── GET /health ──────────────────────────────────────────────────────────────
 app.get('/health', (_, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
