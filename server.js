@@ -56,7 +56,7 @@ app.post('/render', async (req, res) => {
   try {
     const cmd = [
       'npx remotion render',
-      'src/index.jsx',           // <--- نقطة البداية الصحيحة
+      'src/Root.jsx',           // <--- نقطة البداية الصحيحة
       compositionId,
       `"${outputFile}"`,
       `--props="${propsFile}"`,
