@@ -21,61 +21,59 @@ const VIDEO_TYPE_MAP = {
 };
 
 const FPS = 30;
+const PORT = process.env.PORT || 3030;
 
 app.post('/render', async (req, res) => {
   const videoData = req.body;
   const { videoType, sceneTimings, audio } = videoData;
 
-  // File paths
+  // ✅ تعريف كل المتغيرات أولاً
+  const compositionId = VIDEO_TYPE_MAP[videoType] || 'FixVideo';
+  const timestamp     = Date.now();
+  const baseUrl       = process.env.BASE_URL || `http://localhost:${PORT}`;
+
   const silentVideo = path.join(OUTPUT_DIR, `silent_${timestamp}.mp4`);
   const audioFile   = path.join(OUTPUT_DIR, `audio_${timestamp}.mp3`);
   const finalVideo  = path.join(OUTPUT_DIR, `${videoType}_${timestamp}.mp4`);
   const propsFile   = path.join(OUTPUT_DIR, `props_${timestamp}.json`);
 
-  // ── 1. Save audio file ───────────────────────────────────────────────────
+  // ── 1. Save audio ────────────────────────────────────────────────────────
   let hasAudio = false;
   if (audio?.base64 && audio.base64.length > 100) {
     try {
       fs.writeFileSync(audioFile, Buffer.from(audio.base64, 'base64'));
-      hasAudio = true;
       const stats = fs.statSync(audioFile);
-console.log(`[audio] file size: ${stats.size} bytes`);
-      
-      console.log(`[audio] ✅ Saved`);
+      hasAudio = true;
+      console.log(`[audio] ✅ Saved — ${stats.size} bytes`);
     } catch (e) {
       console.error(`[audio] ❌`, e.message);
     }
   }
 
-  // ── 2. Calculate video duration = audio duration exactly ────────────────
+  // ── 2. Calculate duration from sceneTimings ──────────────────────────────
   let audioSec = 30;
   if (sceneTimings?.length > 0) {
     audioSec = sceneTimings[sceneTimings.length - 1].end;
   }
   const totalFrames = Math.ceil(audioSec * FPS);
-
   console.log(`[render] audio=${audioSec}s | frames=${totalFrames}`);
 
-  // ── 3. Write props (no audioUrl — Remotion renders silent) ──────────────
+  // ── 3. Build props (no audio — Remotion renders silent) ──────────────────
   const finalVideoData = { ...videoData };
   delete finalVideoData.audio;
-  delete finalVideoData.audioUrl; // no audio in Remotion
+  delete finalVideoData.audioUrl;
   finalVideoData.totalDurationFrames = totalFrames;
-  finalVideoData.hookDurFrames       = 0; // no offset — start content immediately
-  finalVideoData.ctaDurFrames = Math.ceil(5 * FPS);
+  finalVideoData.hookDurFrames       = 0;
+  finalVideoData.ctaDurFrames        = Math.ceil(5 * FPS);
 
-console.log('[props] audioUrl:', finalVideoData.audioUrl);
-console.log('[props] keys:', Object.keys(finalVideoData));
-
-fs.writeFileSync(propsFile, JSON.stringify({ videoData: finalVideoData }));
-
+  console.log('[props] keys:', Object.keys(finalVideoData));
   fs.writeFileSync(propsFile, JSON.stringify({ videoData: finalVideoData }));
 
   const chromePath = process.env.REMOTION_CHROME_EXECUTABLE || '/usr/bin/chromium';
   const entryPoint = path.join(__dirname, 'src', 'Root.jsx');
 
   try {
-    // ── 4. Render silent video ───────────────────────────────────────────
+    // ── 4. Render silent video ────────────────────────────────────────────
     const renderCmd = [
       'npx remotion render',
       `"${entryPoint}"`,
@@ -86,25 +84,22 @@ fs.writeFileSync(propsFile, JSON.stringify({ videoData: finalVideoData }));
       `--browser-executable="${chromePath}"`,
     ].join(' ');
 
-    console.log(`[render] ▶ Rendering silent video...`);
+    console.log(`[render] ▶ ${compositionId} — ${totalFrames} frames`);
     await execAsync(renderCmd, { cwd: __dirname, timeout: 10 * 60 * 1000 });
     fs.unlinkSync(propsFile);
     console.log(`[render] ✅ Silent video done`);
 
-    // ── 5. Merge audio + video with FFmpeg ───────────────────────────────
+    // ── 5. Merge with FFmpeg ──────────────────────────────────────────────
     if (hasAudio) {
-      console.log(`[ffmpeg] ▶ Merging audio...`);
-
-      // -shortest: ends when the shorter stream ends (video)
-      // -c:v copy: no re-encoding of video
-      // -c:a aac: encode audio to aac for mp4
+      console.log(`[ffmpeg] ▶ Merging...`);
       const ffmpegCmd = [
         'ffmpeg -y',
         `-i "${silentVideo}"`,
         `-i "${audioFile}"`,
         `-c:v copy`,
         `-c:a aac`,
-        `-shortest`,
+        `-map 0:v:0`,
+        `-map 1:a:0`,
         `"${finalVideo}"`,
       ].join(' ');
 
@@ -113,8 +108,8 @@ fs.writeFileSync(propsFile, JSON.stringify({ videoData: finalVideoData }));
       fs.unlinkSync(audioFile);
       console.log(`[ffmpeg] ✅ Merge done`);
     } else {
-      // no audio — just rename
       fs.renameSync(silentVideo, finalVideo);
+      console.log(`[render] ✅ No audio — video only`);
     }
 
     const videoUrl = `${baseUrl}/videos/${videoType}_${timestamp}.mp4`;
@@ -123,15 +118,16 @@ fs.writeFileSync(propsFile, JSON.stringify({ videoData: finalVideoData }));
 
   } catch (err) {
     console.error(`[error] ❌`, err.message);
-    [propsFile, silentVideo, audioFile].forEach(f => { try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch {} });
+    [propsFile, silentVideo, audioFile].forEach(f => {
+      try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch {}
+    });
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get('/health', (_, res) => res.json({ status: 'ok', version: '3.0' }));
-app.get('/', (_, res) => res.json({ service: 'Remotion + FFmpeg', version: '3.0' }));
+app.get('/health', (_, res) => res.json({ status: 'ok', version: '3.1' }));
+app.get('/', (_, res) => res.json({ service: 'Remotion + FFmpeg', version: '3.1' }));
 
-const PORT = process.env.PORT || 3030;
 app.listen(PORT, () => {
   console.log(`🎬 Server → http://localhost:${PORT}`);
 });
