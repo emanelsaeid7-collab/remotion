@@ -8,11 +8,16 @@ const FPS = 30;
 // ── Single Scene Renderer ─────────────────────────────────────────────────────
 const SceneSlide = ({ scene, index, total }) => {
   const frame = useCurrentFrame();
+  
+  // Animation: fade in + slide up (first 15 frames of the scene)
   const progress = interpolate(frame, [0, 15], [0, 1], {
-    extrapolateLeft: 'clamp', extrapolateRight: 'clamp',
+    extrapolateLeft: 'clamp', 
+    extrapolateRight: 'clamp',
   });
+  
   const fadeOut = interpolate(frame, [0, 8], [0, 1], {
-    extrapolateLeft: 'clamp', extrapolateRight: 'clamp',
+    extrapolateLeft: 'clamp', 
+    extrapolateRight: 'clamp',
   });
 
   const colors = ['#6C63FF', '#43E97B', '#38F9D7', '#FF6584', '#FFB347'];
@@ -20,7 +25,7 @@ const SceneSlide = ({ scene, index, total }) => {
 
   return (
     <AbsoluteFill style={{
-      backgroundColor: COLORS.bg || '#0f172a',
+      backgroundColor: COLORS?.bg || '#0f172a',
       justifyContent: 'center',
       alignItems: 'center',
       padding: '80px 60px',
@@ -103,13 +108,16 @@ export const MasterTemplate = ({ videoData }) => {
   const data = videoData || { videoType: 'fix', title: 'Example', solution: [] };
 
   const sceneTimings = data.sceneTimings || [];
-  const scenes       = data.scenes || data.solution || [];
-  const ctaFrames    = data.ctaDurFrames || 150;
+  const scenes = data.scenes || data.solution || [];
+  const ctaFrames = data.ctaDurFrames || 150;
 
-  // 🛠️ مقبض المعايرة (Calibration Knob):
-  // نقوم بتأخير الانتقالات البصرية بمقدار جزئي بالثواني لمنح الصوت وقتاً كافياً لينتهي قبل تبديل النص.
-  // القيمة الافتراضية هنا هي 0.4 ثانية، يمكنك تعديلها إلى 0.3 أو 0.5 أو حتى تمريرها ديناميكياً من n8n باسم visualOffset.
-  const visualOffset = data.visualOffset !== undefined ? data.visualOffset : 0.4;
+  // ✅ Diagnostic logs
+  console.log("--- DIAGNOSTIC ---");
+  console.log("sceneTimings count:", sceneTimings.length);
+  console.log("scenes count:", scenes.length);
+  console.log("audioDuration:", data.audioDuration);
+  console.log("totalDurationFrames:", data.totalDurationFrames);
+  console.log("------------------");
 
   let sections = [];
 
@@ -117,10 +125,12 @@ export const MasterTemplate = ({ videoData }) => {
     sceneTimings.forEach((timing, i) => {
       const scene = scenes[i] || scenes[scenes.length - 1];
       
-      // المشهد الأول يبدأ دائماً من الفريم 0، لكننا نؤخر وقت نهايته ونؤخر بدايات ونهايات المشاهد التالية بالـ visualOffset
-      const startFrame = i === 0 ? 0 : Math.round((timing.start + visualOffset) * FPS);
-      const endFrame = Math.round((timing.end + visualOffset) * FPS);
+      // ✅ استخدم التوقيتات المُعدّلة مباشرة بدون visualOffset تراكمي
+      const startFrame = Math.round(timing.start * FPS);
+      const endFrame = Math.round(timing.end * FPS);
       const durFrames = Math.max(endFrame - startFrame, 1);
+
+      console.log(`[scene ${i + 1}] start=${timing.start}s(${startFrame}f) end=${timing.end}s(${endFrame}f) dur=${durFrames}f`);
 
       sections.push({
         component: <SceneSlide scene={scene} index={i} total={sceneTimings.length} />,
@@ -129,10 +139,10 @@ export const MasterTemplate = ({ videoData }) => {
       });
     });
   } else {
-    // Fallback
-    const totalFrames   = data.totalDurationFrames || 900;
+    // Fallback: divide equally
+    const totalFrames = data.totalDurationFrames || 900;
     const contentFrames = totalFrames - ctaFrames;
-    const perScene      = Math.floor(contentFrames / Math.max(scenes.length, 1));
+    const perScene = Math.floor(contentFrames / Math.max(scenes.length, 1));
 
     scenes.forEach((scene, i) => {
       sections.push({
@@ -143,7 +153,7 @@ export const MasterTemplate = ({ videoData }) => {
     });
   }
 
-  // إضافة الـ CTA في النهاية مباشرة بعد المشهد الأخير المعدل
+  // CTA starts right after last scene
   let ctaStartFrame = 0;
   if (sections.length > 0) {
     const lastSection = sections[sections.length - 1];
@@ -151,6 +161,8 @@ export const MasterTemplate = ({ videoData }) => {
   } else {
     ctaStartFrame = (data.totalDurationFrames || 900) - ctaFrames;
   }
+
+  console.log(`[CTA] startFrame=${ctaStartFrame}, duration=${ctaFrames}`);
 
   sections.push({
     component: <CTASection data={data} />,
@@ -169,23 +181,15 @@ export const MasterTemplate = ({ videoData }) => {
   );
 };
 
-// ── حساب المدة الكلية للفيديو ديناميكياً مع مراعاة الإزاحة ──────────────────────
+// ── Duration Calculator ──────────────────────────────────────────────────────
 export const getTotalDuration = (data) => {
   if (!data) return 900;
 
   const ctaFrames = data.ctaDurFrames || 150;
-  const visualOffset = data.visualOffset !== undefined ? data.visualOffset : 0.4;
 
   if (data.sceneTimings && data.sceneTimings.length > 0) {
     const lastTiming = data.sceneTimings[data.sceneTimings.length - 1];
-    // نضيف الـ visualOffset على المدة الكلية لضمان عدم قطع نهاية الفيديو
-    const scenesDurationSec = lastTiming.end + visualOffset; 
-    const scenesDurationFrames = Math.round(scenesDurationSec * FPS);
-
-    console.log("--- DIAGNOSTIC LOG ---");
-console.log("sceneTimings length received:", sceneTimings.length);
-console.log("scenes length received:", scenes.length);
-console.log("----------------------");
+    const scenesDurationFrames = Math.round(lastTiming.end * FPS);
     
     return scenesDurationFrames + ctaFrames;
   }
