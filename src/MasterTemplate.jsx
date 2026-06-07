@@ -1,6 +1,7 @@
 import React from 'react';
-import { AbsoluteFill, Series, useCurrentFrame } from 'remotion';
+import { AbsoluteFill, Series } from 'remotion';
 
+// Existing Imports
 import { HookSection } from './sections/HookSection';
 import { ProblemSection } from './sections/ProblemSection';
 import { SolutionSection } from './sections/SolutionSection';
@@ -8,14 +9,34 @@ import { ComparisonSection, WinnerSection } from './sections/ComparisonSection';
 import { WorkflowOverview, WorkflowStepSection } from './sections/WorkflowSection';
 import { CTASection } from './sections/CTASection';
 
+// NEW IMPORTS (We will create these files next)
+import { ErrorLogSection, ErrorFixSection } from './sections/ErrorSection';
+import { ConceptSection, TipsSection } from './sections/ProductivitySection';
+import { RedFlagsSection, AdviceSection } from './sections/FreelancingSection';
+import { AutomationTriggerSection, AutomationActionsSection } from './sections/AutomationSection';
+
 // Duration constants (in frames at 30fps)
-const HOOK_DUR = 90;       // 3s
-const PROBLEM_DUR = 120;   // 4s
-const SOLUTION_DUR = 150;  // 5s
-const COMPARISON_DUR = 150;
-const WINNER_DUR = 90;
-const WORKFLOW_STEP_DUR = 120;
-const CTA_DUR = 90;        // 3s
+const HOOK_DUR = 90;         // 3s
+const CTA_DUR = 90;          // 3s
+
+// Specific section durations
+const PROBLEM_DUR = 120;     // 4s
+const SOLUTION_DUR = 150;    // 5s
+const COMPARISON_DUR = 150;  // 5s
+const WINNER_DUR = 90;       // 3s
+const WORKFLOW_STEP_DUR = 120; // 4s
+
+const ERROR_LOG_DUR = 120;   // 4s
+const ERROR_FIX_DUR = 150;   // 5s
+
+const CONCEPT_DUR = 120;     // 4s
+const TIPS_DUR = 150;        // 5s
+
+const RED_FLAGS_DUR = 120;   // 4s
+const ADVICE_DUR = 120;      // 4s
+
+const TRIGGER_DUR = 90;      // 3s
+const ACTIONS_DUR = 150;     // 5s
 
 /**
  * Build the series items based on videoType
@@ -27,10 +48,19 @@ const buildSections = (data) => {
   switch (data.videoType) {
     case 'fix':
       sections.push(
-        { component: <HookSection data={data} />,    duration: HOOK_DUR },
-        { component: <ProblemSection data={data} />, duration: PROBLEM_DUR },
-        { component: <SolutionSection data={data} />,duration: SOLUTION_DUR },
-        { component: <CTASection data={data} />,     duration: CTA_DUR },
+        { component: <HookSection data={data} />,     duration: HOOK_DUR },
+        { component: <ProblemSection data={data} />,  duration: PROBLEM_DUR },
+        { component: <SolutionSection data={data} />, duration: SOLUTION_DUR },
+        { component: <CTASection data={data} />,      duration: CTA_DUR },
+      );
+      break;
+
+    case 'error':
+      sections.push(
+        { component: <HookSection data={data} />,       duration: HOOK_DUR },
+        { component: <ErrorLogSection data={data} />,   duration: ERROR_LOG_DUR },
+        { component: <ErrorFixSection data={data} />,   duration: ERROR_FIX_DUR },
+        { component: <CTASection data={data} />,        duration: CTA_DUR },
       );
       break;
 
@@ -55,6 +85,33 @@ const buildSections = (data) => {
       );
       break;
 
+    case 'productivity':
+      sections.push(
+        { component: <HookSection data={data} />,       duration: HOOK_DUR },
+        { component: <ConceptSection data={data} />,    duration: CONCEPT_DUR },
+        { component: <TipsSection data={data} />,       duration: TIPS_DUR },
+        { component: <CTASection data={data} />,        duration: CTA_DUR },
+      );
+      break;
+
+    case 'freelancing':
+      sections.push(
+        { component: <HookSection data={data} />,       duration: HOOK_DUR },
+        { component: <RedFlagsSection data={data} />,   duration: RED_FLAGS_DUR },
+        { component: <AdviceSection data={data} />,     duration: ADVICE_DUR },
+        { component: <CTASection data={data} />,        duration: CTA_DUR },
+      );
+      break;
+
+    case 'automation':
+      sections.push(
+        { component: <HookSection data={data} />,              duration: HOOK_DUR },
+        { component: <AutomationTriggerSection data={data} />, duration: TRIGGER_DUR },
+        { component: <AutomationActionsSection data={data} />, duration: ACTIONS_DUR },
+        { component: <CTASection data={data} />,               duration: CTA_DUR },
+      );
+      break;
+
     default:
       sections.push(
         { component: <HookSection data={data} />, duration: HOOK_DUR },
@@ -66,11 +123,11 @@ const buildSections = (data) => {
 };
 
 export const MasterTemplate = ({ videoData }) => {
-  const data = videoData || { videoType: 'fix', title: 'Example', problem: '...', solution: ['Step 1'] };
+  const data = videoData || { videoType: 'fix', title: 'Example', problem: 'No data', solution: [] };
   const sections = buildSections(data);
 
   return (
-    <AbsoluteFill>
+    <AbsoluteFill style={{ backgroundColor: '#0f172a', color: 'white' }}>
       <Series>
         {sections.map((sec, i) => (
           <Series.Sequence key={i} durationInFrames={sec.duration}>
@@ -92,10 +149,18 @@ export const getTotalDuration = (data) => {
   switch (data.videoType) {
     case 'fix':
       return HOOK_DUR + PROBLEM_DUR + SOLUTION_DUR + CTA_DUR;
+    case 'error':
+      return HOOK_DUR + ERROR_LOG_DUR + ERROR_FIX_DUR + CTA_DUR;
     case 'comparison':
       return HOOK_DUR + COMPARISON_DUR + WINNER_DUR + CTA_DUR;
     case 'workflow':
-      return HOOK_DUR + WORKFLOW_STEP_DUR + steps.length * WORKFLOW_STEP_DUR + CTA_DUR;
+      return HOOK_DUR + WORKFLOW_STEP_DUR + (steps.length * WORKFLOW_STEP_DUR) + CTA_DUR;
+    case 'productivity':
+      return HOOK_DUR + CONCEPT_DUR + TIPS_DUR + CTA_DUR;
+    case 'freelancing':
+      return HOOK_DUR + RED_FLAGS_DUR + ADVICE_DUR + CTA_DUR;
+    case 'automation':
+      return HOOK_DUR + TRIGGER_DUR + ACTIONS_DUR + CTA_DUR;
     default:
       return HOOK_DUR + CTA_DUR;
   }
