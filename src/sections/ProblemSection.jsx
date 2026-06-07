@@ -10,13 +10,12 @@ export const ProblemSection = ({ data }) => {
   return (
     <div style={{ ...baseContainer }}>
       <AnimatedBG accentColor={COLORS.danger} />
-
       <div style={{ zIndex: 10, width: '100%', maxWidth: 1000, padding: '0 60px' }}>
+
         <AnimText delay={0} duration={15} style={{ marginBottom: 30 }}>
-          <GlowBadge color={COLORS.danger} delay={0}>🚨 المشكلة</GlowBadge>
+          <GlowBadge color={COLORS.danger} delay={0}>🚨 The Problem</GlowBadge>
         </AnimText>
 
-        {/* Problem card */}
         <AnimText delay={10} duration={20} from={{ opacity: 0, y: 40 }}>
           <div style={{
             background: `linear-gradient(135deg, ${COLORS.danger}15, ${COLORS.bgCard})`,
@@ -36,7 +35,6 @@ export const ProblemSection = ({ data }) => {
           </div>
         </AnimText>
 
-        {/* Cause card */}
         {data.cause && (
           <AnimText delay={25} duration={20} from={{ opacity: 0, y: 40 }}>
             <div style={{
@@ -50,7 +48,9 @@ export const ProblemSection = ({ data }) => {
             }}>
               <div style={{ fontSize: 36 }}>🔍</div>
               <div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.warning, marginBottom: 8, letterSpacing: 1, textTransform: 'uppercase' }}>السبب</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.warning, marginBottom: 8, letterSpacing: 1, textTransform: 'uppercase' }}>
+                  Root Cause
+                </div>
                 <div style={{ fontSize: 22, color: COLORS.textMuted, lineHeight: 1.6 }}>
                   {data.cause}
                 </div>
