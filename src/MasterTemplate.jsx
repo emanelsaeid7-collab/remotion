@@ -1,5 +1,5 @@
 import React from 'react';
-import { AbsoluteFill, Series, useCurrentFrame, interpolate } from 'remotion';
+import { AbsoluteFill, Sequence, useCurrentFrame, interpolate } from 'remotion'; // تم استبدال Series بـ Sequence
 import { CTASection } from './sections/CTASection';
 import { COLORS } from './styles';
 
@@ -110,14 +110,18 @@ export const MasterTemplate = ({ videoData }) => {
   let sections = [];
 
   if (sceneTimings.length > 0 && scenes.length > 0) {
-    // Each scene duration comes from sceneTimings
+    // نعتمد هنا على التموضع المطلق (Absolute positioning) لكل مشهد لمنع حدوث التباعد الزمني
     sceneTimings.forEach((timing, i) => {
-      const scene    = scenes[i] || scenes[scenes.length - 1];
-      const durSec   = timing.end - timing.start;
-      const durFrames = Math.max(Math.ceil(durSec * FPS), 1);
+      const scene = scenes[i] || scenes[scenes.length - 1];
+      
+      // تحويل دقيق لثواني البدء والنهاية إلى فريمات
+      const startFrame = Math.round(timing.start * FPS);
+      const endFrame = Math.round(timing.end * FPS);
+      const durFrames = Math.max(endFrame - startFrame, 1);
 
       sections.push({
         component: <SceneSlide scene={scene} index={i} total={sceneTimings.length} />,
+        from: startFrame,
         duration: durFrames,
       });
     });
@@ -130,26 +134,35 @@ export const MasterTemplate = ({ videoData }) => {
     scenes.forEach((scene, i) => {
       sections.push({
         component: <SceneSlide scene={scene} index={i} total={scenes.length} />,
+        from: i * perScene,
         duration: perScene,
       });
     });
   }
 
-  // Add CTA at the end
+  // تحديد موضع بداية الـ CTA بعد نهاية آخر مشهد مباشرة
+  let ctaStartFrame = 0;
+  if (sections.length > 0) {
+    const lastSection = sections[sections.length - 1];
+    ctaStartFrame = lastSection.from + lastSection.duration;
+  } else {
+    ctaStartFrame = (data.totalDurationFrames || 900) - ctaFrames;
+  }
+
   sections.push({
     component: <CTASection data={data} />,
+    from: ctaStartFrame,
     duration: ctaFrames,
   });
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#0f172a', color: 'white' }}>
-      <Series>
-        {sections.map((sec, i) => (
-          <Series.Sequence key={i} durationInFrames={sec.duration}>
-            <AbsoluteFill>{sec.component}</AbsoluteFill>
-          </Series.Sequence>
-        ))}
-      </Series>
+      {/* نستخدم التموضع المطلق Sequence هنا بدلاً من Series لتثبيت توقيت كل مشهد بدقة */}
+      {sections.map((sec, i) => (
+        <Sequence key={i} from={sec.from} durationInFrames={sec.duration}>
+          <AbsoluteFill>{sec.component}</AbsoluteFill>
+        </Sequence>
+      ))}
     </AbsoluteFill>
   );
 };
