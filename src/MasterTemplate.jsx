@@ -1,24 +1,20 @@
 import React from 'react';
 import { AbsoluteFill, Series, Audio } from 'remotion';
 
-import { HookSection } from './sections/HookSection';
-import { ProblemSection } from './sections/ProblemSection';
-import { SolutionSection } from './sections/SolutionSection';
-import { ComparisonSection, WinnerSection } from './sections/ComparisonSection';
+import { HookSection }                           from './sections/HookSection';
+import { ProblemSection }                        from './sections/ProblemSection';
+import { SolutionSection }                       from './sections/SolutionSection';
+import { ComparisonSection, WinnerSection }      from './sections/ComparisonSection';
 import { WorkflowOverview, WorkflowStepSection } from './sections/WorkflowSection';
-import { CTASection } from './sections/CTASection';
+import { CTASection }                            from './sections/CTASection';
 
-// Duration constants (in frames at 30fps)
-const HOOK_DUR          = 150; // 5s
-const CTA_DUR           = 150; // 5s
-const PROBLEM_DUR       = 240; // 8s
-const SOLUTION_DUR      = 360; // 12s
-const COMPARISON_DUR    = 300; // 10s
-const WINNER_DUR        = 180; // 6s
-const WORKFLOW_STEP_DUR = 150; // 5s
+// Default durations (fallback only — overridden by server-calculated values)
+const DEFAULT_HOOK_FRAMES     = 150; // 5s
+const DEFAULT_CTA_FRAMES      = 150; // 5s
+const DEFAULT_CONTENT_FRAMES  = 540; // 18s
+const FPS = 30;
 
-const buildSections = (data) => {
-  const sections = [];
+const buildSections = (data, hookDur, contentDur, ctaDur) => {
   const steps = data.steps || [];
 
   switch (data.videoType) {
@@ -26,55 +22,58 @@ const buildSections = (data) => {
     case 'error':
     case 'productivity':
     case 'freelancing':
-      sections.push(
-        { component: <HookSection data={data} />,     duration: HOOK_DUR },
-        { component: <ProblemSection data={data} />,  duration: PROBLEM_DUR },
-        { component: <SolutionSection data={data} />, duration: SOLUTION_DUR },
-        { component: <CTASection data={data} />,      duration: CTA_DUR },
-      );
-      break;
+      return [
+        { component: <HookSection data={data} />,     duration: hookDur },
+        { component: <ProblemSection data={data} />,  duration: Math.floor(contentDur * 0.35) },
+        { component: <SolutionSection data={data} />, duration: Math.floor(contentDur * 0.65) },
+        { component: <CTASection data={data} />,      duration: ctaDur },
+      ];
 
     case 'comparison':
-      sections.push(
-        { component: <HookSection data={data} />,       duration: HOOK_DUR },
-        { component: <ComparisonSection data={data} />, duration: COMPARISON_DUR },
-        { component: <WinnerSection data={data} />,     duration: WINNER_DUR },
-        { component: <CTASection data={data} />,        duration: CTA_DUR },
-      );
-      break;
+      return [
+        { component: <HookSection data={data} />,       duration: hookDur },
+        { component: <ComparisonSection data={data} />, duration: Math.floor(contentDur * 0.65) },
+        { component: <WinnerSection data={data} />,     duration: Math.floor(contentDur * 0.35) },
+        { component: <CTASection data={data} />,        duration: ctaDur },
+      ];
 
     case 'workflow':
     case 'automation':
-      sections.push(
-        { component: <HookSection data={data} />,      duration: HOOK_DUR },
-        { component: <WorkflowOverview data={data} />, duration: WORKFLOW_STEP_DUR },
+      const perStep = steps.length > 0 ? Math.floor(contentDur / (steps.length + 1)) : contentDur;
+      return [
+        { component: <HookSection data={data} />,      duration: hookDur },
+        { component: <WorkflowOverview data={data} />, duration: perStep },
         ...steps.map((_, i) => ({
           component: <WorkflowStepSection data={data} stepIndex={i} />,
-          duration: WORKFLOW_STEP_DUR,
+          duration: perStep,
         })),
-        { component: <CTASection data={data} />, duration: CTA_DUR },
-      );
-      break;
+        { component: <CTASection data={data} />, duration: ctaDur },
+      ];
 
     default:
-      sections.push(
-        { component: <HookSection data={data} />, duration: HOOK_DUR },
-        { component: <CTASection data={data} />,  duration: CTA_DUR },
-      );
+      return [
+        { component: <HookSection data={data} />, duration: hookDur },
+        { component: <CTASection data={data} />,  duration: ctaDur },
+      ];
   }
-
-  return sections;
 };
 
 export const MasterTemplate = ({ videoData }) => {
   const data = videoData || { videoType: 'fix', title: 'Example', problem: '...', solution: [] };
-  const sections = buildSections(data);
+
+  // ── Use server-calculated durations if available ──────────────────────────
+  const hookDur    = data.hookDurFrames    || DEFAULT_HOOK_FRAMES;
+  const ctaDur     = data.ctaDurFrames     || DEFAULT_CTA_FRAMES;
+  const totalDur   = data.totalDurationFrames || (DEFAULT_HOOK_FRAMES + DEFAULT_CONTENT_FRAMES + DEFAULT_CTA_FRAMES);
+  const contentDur = totalDur - hookDur - ctaDur;
+
+  const sections = buildSections(data, hookDur, contentDur, ctaDur);
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#0f172a', color: 'white' }}>
-      {/* Audio plays across the entire video */}
+      {/* Audio spans entire video */}
       {data.audioUrl && (
-        <Audio src={data.audioUrl} />
+        <Audio src={data.audioUrl} startFrom={0} />
       )}
       <Series>
         {sections.map((sec, i) => (
@@ -87,22 +86,15 @@ export const MasterTemplate = ({ videoData }) => {
   );
 };
 
+// For Root.jsx preview — uses defaults
 export const getTotalDuration = (data) => {
-  if (!data) return HOOK_DUR + CTA_DUR;
+  if (!data) return DEFAULT_HOOK_FRAMES + DEFAULT_CONTENT_FRAMES + DEFAULT_CTA_FRAMES;
   const steps = data.steps || [];
-
   switch (data.videoType) {
-    case 'fix':
-    case 'error':
-    case 'productivity':
-    case 'freelancing':
-      return HOOK_DUR + PROBLEM_DUR + SOLUTION_DUR + CTA_DUR;
-    case 'comparison':
-      return HOOK_DUR + COMPARISON_DUR + WINNER_DUR + CTA_DUR;
     case 'workflow':
     case 'automation':
-      return HOOK_DUR + WORKFLOW_STEP_DUR + (steps.length * WORKFLOW_STEP_DUR) + CTA_DUR;
+      return DEFAULT_HOOK_FRAMES + (steps.length + 1) * 150 + DEFAULT_CTA_FRAMES;
     default:
-      return HOOK_DUR + CTA_DUR;
+      return DEFAULT_HOOK_FRAMES + DEFAULT_CONTENT_FRAMES + DEFAULT_CTA_FRAMES;
   }
 };
