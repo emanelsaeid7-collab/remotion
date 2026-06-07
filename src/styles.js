@@ -1,43 +1,60 @@
+// ── SmartRemoteGigs Design System ───────────────────────────────────────────
+
 export const COLORS = {
-  bg: '#0A0A0F',
-  bgCard: '#12121A',
-  bgGlass: 'rgba(255,255,255,0.04)',
-  primary: '#6C63FF',
-  primaryGlow: 'rgba(108,99,255,0.3)',
-  secondary: '#FF6584',
-  accent: '#43E97B',
-  accentBlue: '#38F9D7',
-  text: '#FFFFFF',
-  textMuted: '#8888AA',
-  border: 'rgba(255,255,255,0.08)',
-  success: '#43E97B',
-  danger: '#FF6584',
-  warning: '#FFB347',
+  primary:   '#7C3AED',   // بنفسجي — العلامة الرئيسية
+  secondary: '#06B6D4',   // سماوي — التفاصيل والتأكيد
+  success:   '#10B981',   // أخضر — الإنجاز والـ CTA
+  bg:        '#FFFFFF',   // خلفية رئيسية
+  surface:   '#F8FAFC',   // سطح البطاقات
+  border:    '#E5E7EB',   // الحدود
+  text:      '#222222',   // النص الرئيسي
+  muted:     '#626262',   // النص الثانوي
+  white:     '#FFFFFF',
 };
 
 export const FONTS = {
-  heading: '"Inter", "Segoe UI", sans-serif',
-  body: '"Inter", "Segoe UI", sans-serif',
-  mono: '"Fira Code", monospace',
+  heading: '"Inter", "Segoe UI", "SF Pro Display", -apple-system, sans-serif',
+  body:    '"Inter", "Segoe UI", "SF Pro Text", -apple-system, sans-serif',
 };
 
-export const EASE = {
-  out: 'cubic-bezier(0.0, 0.0, 0.2, 1)',
-  in: 'cubic-bezier(0.4, 0.0, 1, 1)',
-  inOut: 'cubic-bezier(0.4, 0.0, 0.2, 1)',
-  spring: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+export const SHADOWS = {
+  sm: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+  md: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+  lg: '0 10px 15px -3px rgba(124, 58, 237, 0.1), 0 4px 6px -2px rgba(124, 58, 237, 0.05)',
+  glow: '0 0 40px rgba(124, 58, 237, 0.15)',
 };
 
-export const baseContainer = {
-  width: '100%',
-  height: '100%',
-  backgroundColor: COLORS.bg,
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  fontFamily: FONTS.body,
-  color: COLORS.text,
-  overflow: 'hidden',
-  position: 'relative',
+// أيقونات SVG بسيطة لكل نوع فيديو
+export const VIDEO_TYPE_ICONS = {
+  fix:         '🔧',
+  error:       '⚡',
+  comparison:  '⚖️',
+  workflow:    '⚙️',
+  productivity:'🚀',
+  freelancing: '💼',
+  automation:  '🤖',
+  default:     '✨',
+};
+
+export const VIDEO_TYPE_LABELS = {
+  fix:         'Quick Fix',
+  error:         'Error Solved',
+  comparison:    'Comparison',
+  workflow:      'Workflow',
+  productivity:  'Productivity',
+  freelancing:   'Freelancing',
+  automation:    'Automation',
+  default:       'Smart Tip',
+};
+
+// تدرجات ألوان لكل نوع (Primary + Secondary blends)
+export const VIDEO_TYPE_GRADIENTS = {
+  fix:         ['#7C3AED', '#06B6D4'],
+  error:       ['#EF4444', '#7C3AED'],
+  comparison:  ['#06B6D4', '#10B981'],
+  workflow:    ['#7C3AED', '#10B981'],
+  productivity:['#10B981', '#06B6D4'],
+  freelancing: ['#F59E0B', '#7C3AED'],
+  automation:  ['#7C3AED', '#EC4899'],
+  default:     ['#7C3AED', '#06B6D4'],
 };
