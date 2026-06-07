@@ -1,5 +1,5 @@
 import React from 'react';
-import { Composition } from 'remotion';
+import { Composition, registerRoot } from 'remotion'; // 👈 أضفنا registerRoot هنا
 import { MasterTemplate, getTotalDuration } from './MasterTemplate';
 
 // 1. Fix Data
@@ -119,3 +119,6 @@ export const RemotionRoot = () => {
     </>
   );
 };
+
+// 👈 قمنا بإعادة السطر السحري هنا لتسجيل الفيديو!
+registerRoot(RemotionRoot);
