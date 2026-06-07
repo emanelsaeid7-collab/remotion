@@ -6,9 +6,8 @@ export const CTASection = ({ data }) => {
   const frame = useCurrentFrame();
   const videoType = data?.videoType || 'fix';
   const gradient = VIDEO_TYPE_GRADIENTS[videoType] || VIDEO_TYPE_GRADIENTS.default;
-  const logoPath = data?.logoPath || null;
+  const logoBase64 = data?.logoBase64 || null;
 
-  // Staggered animations
   const bgOpacity = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
   const contentY = interpolate(frame, [5, 20], [60, 0], { extrapolateRight: 'clamp', easing: Easing.out(Easing.cubic) });
   const contentOpacity = interpolate(frame, [5, 20], [0, 1], { extrapolateRight: 'clamp' });
@@ -39,7 +38,7 @@ export const CTASection = ({ data }) => {
         opacity: bgOpacity,
       }} />
 
-      {/* Logo */}
+      {/* Logo + Brand */}
       <div style={{
         opacity: contentOpacity,
         transform: `translateY(${contentY}px) scale(${logoScale})`,
@@ -48,9 +47,9 @@ export const CTASection = ({ data }) => {
         alignItems: 'center',
         gap: 20,
       }}>
-        {logoPath ? (
+        {logoBase64 ? (
           <Img
-            src={logoPath}
+            src={logoBase64}
             style={{
               width: 72,
               height: 72,
@@ -136,9 +135,9 @@ export const CTASection = ({ data }) => {
           alignItems: 'center',
           gap: 12,
         }}>
-          {logoPath && (
+          {logoBase64 && (
             <Img
-              src={logoPath}
+              src={logoBase64}
               style={{
                 width: 32,
                 height: 32,
