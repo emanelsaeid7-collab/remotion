@@ -26,10 +26,6 @@ app.post('/render', async (req, res) => {
   const videoData = req.body;
   const { videoType, sceneTimings, audio } = videoData;
 
-  const compositionId = VIDEO_TYPE_MAP[videoType] || 'FixVideo';
-  const timestamp     = Date.now();
-  const baseUrl       = process.env.BASE_URL || `http://localhost:${PORT}`;
-
   // File paths
   const silentVideo = path.join(OUTPUT_DIR, `silent_${timestamp}.mp4`);
   const audioFile   = path.join(OUTPUT_DIR, `audio_${timestamp}.mp3`);
@@ -66,7 +62,12 @@ console.log(`[audio] file size: ${stats.size} bytes`);
   delete finalVideoData.audioUrl; // no audio in Remotion
   finalVideoData.totalDurationFrames = totalFrames;
   finalVideoData.hookDurFrames       = 0; // no offset — start content immediately
-  finalVideoData.ctaDurFrames        = Math.ceil(5 * FPS);
+  finalVideoData.ctaDurFrames = Math.ceil(5 * FPS);
+
+console.log('[props] audioUrl:', finalVideoData.audioUrl);
+console.log('[props] keys:', Object.keys(finalVideoData));
+
+fs.writeFileSync(propsFile, JSON.stringify({ videoData: finalVideoData }));
 
   fs.writeFileSync(propsFile, JSON.stringify({ videoData: finalVideoData }));
 
