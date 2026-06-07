@@ -1,0 +1,6 @@
+node_modules
+output
+.git
+*.zip
+README.md
+n8n-workflow.json

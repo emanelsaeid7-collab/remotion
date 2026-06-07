@@ -1,0 +1,23 @@
+{
+  "name": "remotion-master-template",
+  "version": "1.0.0",
+  "description": "Master Remotion Template with n8n integration",
+  "type": "module",
+  "scripts": {
+    "dev": "npx remotion studio",
+    "render:fix": "npx remotion render FixVideo output/fix.mp4",
+    "render:comparison": "npx remotion render ComparisonVideo output/comparison.mp4",
+    "render:workflow": "npx remotion render WorkflowVideo output/workflow.mp4",
+    "server": "node server.js"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.0",
+    "express": "^4.22.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "remotion": "^4.0.0"
+  },
+  "remotion": {
+    "entryPoint": "src/Root.jsx"
+  }
+}

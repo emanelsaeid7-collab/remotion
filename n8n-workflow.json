@@ -1,0 +1,71 @@
+{
+  "name": "Remotion Video Generator — Coolify",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generate-video",
+        "responseMode": "responseNode"
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [{ "value1": "={{ $json.body.videoType }}", "operation": "isNotEmpty" }]
+        }
+      },
+      "id": "validate-input",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.if",
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.REMOTION_URL }}/render",
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": { "timeout": 600000 }
+      },
+      "id": "render-video",
+      "name": "Render Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [640, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, videoUrl: $json.url, file: $json.file } }}"
+      },
+      "id": "success-response",
+      "name": "Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [860, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: 'videoType مطلوب: fix | comparison | workflow' } }}",
+        "options": { "responseCode": 400 }
+      },
+      "id": "error-response",
+      "name": "Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [640, 420]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": { "main": [[ { "node": "Validate Input", "type": "main", "index": 0 } ]] },
+    "Validate Input": { "main": [
+      [ { "node": "Render Video", "type": "main", "index": 0 } ],
+      [ { "node": "Error Response", "type": "main", "index": 0 } ]
+    ]},
+    "Render Video": { "main": [[ { "node": "Success Response", "type": "main", "index": 0 } ]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}
