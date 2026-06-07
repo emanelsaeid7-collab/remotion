@@ -71,9 +71,17 @@ export const MasterTemplate = ({ videoData }) => {
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#0f172a', color: 'white' }}>
-      {/* Audio spans entire video */}
+      {/* Audio starts after Hook section ends */}
       {data.audioUrl && (
-        <Audio src={data.audioUrl} startFrom={0} />
+        <Series>
+          <Series.Sequence durationInFrames={hookDur}>
+            {/* silence during hook */}
+            <></>
+          </Series.Sequence>
+          <Series.Sequence durationInFrames={contentDur + ctaDur}>
+            <Audio src={data.audioUrl} />
+          </Series.Sequence>
+        </Series>
       )}
       <Series>
         {sections.map((sec, i) => (
