@@ -26,9 +26,13 @@ const VIDEO_TYPE_MAP = {
   automation:   'WorkflowVideo',
 };
 
+const FPS = 30;
+const HOOK_DUR_SEC  = 5;
+const CTA_DUR_SEC   = 5;
+
 app.post('/render', async (req, res) => {
   const videoData = req.body;
-  const { videoType } = videoData;
+  const { videoType, sceneTimings, audio } = videoData;
 
   const compositionId = VIDEO_TYPE_MAP[videoType] || 'FixVideo';
   const timestamp     = Date.now();
@@ -39,29 +43,46 @@ app.post('/render', async (req, res) => {
 
   let finalVideoData = { ...videoData };
 
-  // ── Handle audio ────────────────────────────────────────────────────────────
-  const audioBase64 = videoData.audio?.base64;
-
-  if (audioBase64 && audioBase64 !== 'filesystem-v2' && audioBase64.length > 100) {
+  // ── Save audio base64 as MP3 ─────────────────────────────────────────────
+  if (audio?.base64 && audio.base64.length > 100) {
     try {
       const audioFilename = `audio_${timestamp}.mp3`;
       const audioPath     = path.join(OUTPUT_DIR, audioFilename);
-      const audioBuffer   = Buffer.from(audioBase64, 'base64');
-      fs.writeFileSync(audioPath, audioBuffer);
+      fs.writeFileSync(audioPath, Buffer.from(audio.base64, 'base64'));
       finalVideoData.audioUrl = `${baseUrl}/audio/${audioFilename}`;
       console.log(`[audio] ✅ Saved: ${audioFilename}`);
     } catch (e) {
-      console.error(`[audio] ❌ Failed:`, e.message);
+      console.error(`[audio] ❌`, e.message);
     }
   }
-
   delete finalVideoData.audio;
+
+  // ── Calculate duration from sceneTimings + audio length ─────────────────
+  let totalDurationFrames;
+
+  if (sceneTimings && sceneTimings.length > 0) {
+    // آخر scene end = مدة الصوت الحقيقية
+    const audioEndSec   = sceneTimings[sceneTimings.length - 1].end;
+    // نضيف Hook (5s) + CTA (5s) للمدة الكلية
+    const totalSec      = HOOK_DUR_SEC + audioEndSec + CTA_DUR_SEC;
+    totalDurationFrames = Math.ceil(totalSec * FPS);
+    console.log(`[duration] audio=${audioEndSec}s total=${totalSec}s frames=${totalDurationFrames}`);
+  } else {
+    // fallback إذا لم توجد sceneTimings
+    totalDurationFrames = 30 * FPS; // 30 ثانية افتراضي
+  }
+
+  // أضف المدة للـ props عشان Remotion يعرف
+  finalVideoData.totalDurationFrames = totalDurationFrames;
+  finalVideoData.hookDurFrames       = HOOK_DUR_SEC * FPS;
+  finalVideoData.ctaDurFrames        = CTA_DUR_SEC * FPS;
+
   fs.writeFileSync(propsFile, JSON.stringify({ videoData: finalVideoData }));
 
-  const chromePath  = process.env.REMOTION_CHROME_EXECUTABLE || '/usr/bin/chromium';
-  const entryPoint  = path.join(__dirname, 'src', 'Root.jsx');
+  const chromePath = process.env.REMOTION_CHROME_EXECUTABLE || '/usr/bin/chromium';
+  const entryPoint = path.join(__dirname, 'src', 'Root.jsx');
 
-  console.log(`[render] ▶ ${compositionId} — ${new Date().toISOString()}`);
+  console.log(`[render] ▶ ${compositionId} frames=${totalDurationFrames}`);
 
   try {
     const cmd = [
@@ -70,6 +91,7 @@ app.post('/render', async (req, res) => {
       compositionId,
       `"${outputFile}"`,
       `--props="${propsFile}"`,
+      `--frames=0-${totalDurationFrames - 1}`,
       `--browser-executable="${chromePath}"`,
     ].join(' ');
 
@@ -79,17 +101,17 @@ app.post('/render', async (req, res) => {
 
     const videoUrl = `${baseUrl}/videos/${filename}`;
     console.log(`[render] ✅ Done: ${videoUrl}`);
-    res.json({ success: true, url: videoUrl, file: filename, videoType });
+    res.json({ success: true, url: videoUrl, file: filename, videoType, durationSec: totalDurationFrames / FPS });
 
   } catch (err) {
-    console.error(`[render] ❌ Error:`, err.message);
+    console.error(`[render] ❌`, err.message);
     if (fs.existsSync(propsFile)) fs.unlinkSync(propsFile);
     res.status(500).json({ error: err.message });
   }
 });
 
 app.get('/health', (_, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
-app.get('/', (_, res) => res.json({ service: 'Remotion Master Template', version: '2.1' }));
+app.get('/', (_, res) => res.json({ service: 'Remotion Master Template', version: '2.2' }));
 
 const PORT = process.env.PORT || 3030;
 app.listen(PORT, () => {
