@@ -1,105 +1,155 @@
 import React from 'react';
-import { interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
-import { COLORS, baseContainer } from '../styles';
-import { AnimatedBG } from '../components/AnimatedBG';
-import { AnimText, GlowBadge } from '../components/AnimText';
+import { AbsoluteFill, useCurrentFrame, interpolate, Easing } from 'remotion';
+import { COLORS, FONTS, SHADOWS, VIDEO_TYPE_GRADIENTS } from '../styles';
 
 export const CTASection = ({ data }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const videoType = data?.videoType || 'fix';
+  const gradient = VIDEO_TYPE_GRADIENTS[videoType] || VIDEO_TYPE_GRADIENTS.default;
 
-  const ctaText = data.cta?.text || 'تابعني للمزيد من المحتوى التقني!';
-  const ctaEmoji = data.cta?.emoji || '🚀';
-  const ctaHandle = data.cta?.handle || '@yourhandle';
-
-  const bounce = spring({ frame, fps, config: { damping: 12, stiffness: 150 } });
-  const glow = Math.sin(frame / 20) * 0.4 + 0.6;
+  // Staggered animations
+  const bgOpacity = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
+  const contentY = interpolate(frame, [5, 20], [60, 0], { extrapolateRight: 'clamp', easing: Easing.out(Easing.cubic) });
+  const contentOpacity = interpolate(frame, [5, 20], [0, 1], { extrapolateRight: 'clamp' });
+  const buttonScale = interpolate(frame, [15, 25], [0.8, 1], { extrapolateRight: 'clamp', easing: Easing.out(Easing.back(1.7)) });
 
   return (
-    <div style={{ ...baseContainer }}>
-      <AnimatedBG accentColor={COLORS.primary} />
+    <AbsoluteFill style={{
+      backgroundColor: COLORS.bg,
+      justifyContent: 'center',
+      alignItems: 'center',
+      flexDirection: 'column',
+      gap: 32,
+      fontFamily: FONTS.body,
+      padding: '60px',
+    }}>
+      {/* Background glow */}
+      <div style={{
+        position: 'absolute',
+        top: '20%',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        width: 700,
+        height: 500,
+        borderRadius: '50%',
+        background: `radial-gradient(circle, ${gradient[0]}18 0%, ${gradient[1]}10 50%, transparent 70%)`,
+        filter: 'blur(80px)',
+        opacity: bgOpacity,
+      }} />
 
-      {/* Particle burst */}
-      {[...Array(8)].map((_, i) => {
-        const angle = (i / 8) * Math.PI * 2;
-        const dist = interpolate(frame, [0, 40], [0, 200], { extrapolateRight: 'clamp' });
-        const fadeOut = interpolate(frame, [30, 60], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-        return (
-          <div key={i} style={{
-            position: 'absolute',
-            left: '50%',
-            top: '50%',
-            width: 10,
-            height: 10,
-            borderRadius: '50%',
-            background: [COLORS.primary, COLORS.accent, COLORS.secondary, COLORS.accentBlue][i % 4],
-            transform: `translate(${Math.cos(angle) * dist - 5}px, ${Math.sin(angle) * dist - 5}px)`,
-            opacity: fadeOut,
-          }} />
-        );
-      })}
-
-      <div style={{ zIndex: 10, textAlign: 'center', padding: '0 80px', maxWidth: 900 }}>
-        {/* Emoji */}
+      {/* Logo area */}
+      <div style={{
+        opacity: contentOpacity,
+        transform: `translateY(${contentY}px)`,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 16,
+        zIndex: 10,
+      }}>
         <div style={{
-          fontSize: 80,
-          marginBottom: 20,
-          transform: `scale(${bounce})`,
-          filter: `drop-shadow(0 0 30px ${COLORS.primary})`,
+          width: 56,
+          height: 56,
+          borderRadius: 16,
+          background: `linear-gradient(135deg, ${gradient[0]}, ${gradient[1]})`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 28,
+          boxShadow: SHADOWS.md,
         }}>
-          {ctaEmoji}
+          🚀
         </div>
-
-        {/* Main CTA text */}
-        <AnimText delay={10} duration={20} from={{ opacity: 0, y: 30 }}>
-          <div style={{
-            fontSize: 48,
-            fontWeight: 900,
-            color: COLORS.text,
-            lineHeight: 1.2,
-            marginBottom: 20,
-            textShadow: `0 0 ${30 * glow}px ${COLORS.primary}66`,
-          }}>
-            {ctaText}
-          </div>
-        </AnimText>
-
-        {/* Handle */}
-        <AnimText delay={25} duration={15}>
-          <div style={{
-            display: 'inline-block',
-            fontSize: 30,
-            fontWeight: 800,
-            color: COLORS.primary,
-            padding: '12px 36px',
-            background: `${COLORS.primary}18`,
-            border: `2px solid ${COLORS.primary}`,
-            borderRadius: 100,
-            boxShadow: `0 0 ${20 * glow}px ${COLORS.primary}44`,
-          }}>
-            {ctaHandle}
-          </div>
-        </AnimText>
-
-        {/* Action buttons */}
-        <AnimText delay={35} duration={15} style={{ marginTop: 30 }}>
-          <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
-            {['❤️ Like', '🔔 Subscribe', '💬 Comment'].map((btn, i) => (
-              <div key={i} style={{
-                padding: '10px 24px',
-                background: COLORS.bgGlass,
-                border: `1px solid ${COLORS.border}`,
-                borderRadius: 100,
-                fontSize: 18,
-                color: COLORS.textMuted,
-                fontWeight: 600,
-              }}>
-                {btn}
-              </div>
-            ))}
-          </div>
-        </AnimText>
+        <span style={{
+          fontFamily: FONTS.heading,
+          fontSize: 36,
+          fontWeight: 800,
+          color: COLORS.text,
+          letterSpacing: -1,
+        }}>
+          SmartRemoteGigs
+        </span>
       </div>
-    </div>
+
+      {/* Headline */}
+      <div style={{
+        opacity: contentOpacity,
+        transform: `translateY(${contentY}px)`,
+        textAlign: 'center',
+        zIndex: 10,
+        maxWidth: 800,
+      }}>
+        <h2 style={{
+          margin: 0,
+          fontSize: 52,
+          fontWeight: 800,
+          color: COLORS.text,
+          lineHeight: 1.2,
+          fontFamily: FONTS.heading,
+          letterSpacing: -1,
+        }}>
+          {data?.ctaTitle || 'Work Smarter, Not Harder'}
+        </h2>
+        <p style={{
+          margin: '20px 0 0',
+          fontSize: 24,
+          color: COLORS.muted,
+          lineHeight: 1.5,
+          fontWeight: 400,
+        }}>
+          {data?.ctaSubtitle || 'Join thousands of digital workers solving problems with AI & modern tools.'}
+        </p>
+      </div>
+
+      {/* CTA Button */}
+      <div style={{
+        opacity: contentOpacity,
+        transform: `translateY(${contentY}px) scale(${buttonScale})`,
+        zIndex: 10,
+        marginTop: 16,
+      }}>
+        <div style={{
+          background: `linear-gradient(135deg, ${gradient[0]}, ${gradient[1]})`,
+          color: COLORS.white,
+          padding: '20px 48px',
+          borderRadius: 16,
+          fontSize: 22,
+          fontWeight: 700,
+          fontFamily: FONTS.heading,
+          boxShadow: `0 10px 30px ${gradient[0]}40, ${SHADOWS.md}`,
+          letterSpacing: 0.5,
+        }}>
+          {data?.ctaText || '👉 Visit SmartRemoteGigs.com'}
+        </div>
+      </div>
+
+      {/* Trust indicators */}
+      <div style={{
+        opacity: contentOpacity,
+        transform: `translateY(${contentY}px)`,
+        display: 'flex',
+        gap: 24,
+        marginTop: 24,
+        zIndex: 10,
+      }}>
+        {['AI Tools', 'Productivity', 'Freelancing'].map((tag, i) => (
+          <div key={i} style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            fontSize: 15,
+            color: COLORS.muted,
+            fontWeight: 600,
+          }}>
+            <div style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              backgroundColor: COLORS.success,
+            }} />
+            {tag}
+          </div>
+        ))}
+      </div>
+    </AbsoluteFill>
   );
 };
