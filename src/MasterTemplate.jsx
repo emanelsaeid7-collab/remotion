@@ -103,14 +103,15 @@ export const MasterTemplate = ({ videoData }) => {
   const data = videoData || { videoType: 'fix', title: 'Example', solution: [] };
 
   const sceneTimings = data.sceneTimings || [];
-  const scenes       = data.solution     || [];
+  
+  // تعديل ذكي: يدعم قراءة scenes أو solution لتفادي مشكلة المسميات الفارغة
+  const scenes       = data.scenes || data.solution || []; 
   const ctaFrames    = data.ctaDurFrames || 150;
 
-  // ── Build sections from sceneTimings ──────────────────────────────────────
   let sections = [];
 
   if (sceneTimings.length > 0 && scenes.length > 0) {
-    // نستخدم التموضع المطلق المبني على قيم الثواني الحقيقية لمنع التراكم أو التباعد عن الصوت
+    // التموضع المطلق بالاعتماد على توقيتات n8n
     sceneTimings.forEach((timing, i) => {
       const scene = scenes[i] || scenes[scenes.length - 1];
       
@@ -125,7 +126,7 @@ export const MasterTemplate = ({ videoData }) => {
       });
     });
   } else {
-    // Fallback: تقسيم متساوي في حال عدم تمرير التوقيتات بشكل صحيح
+    // خيار الاحتياط فقط في حال لم تتوفر التوقيتات
     const totalFrames   = data.totalDurationFrames || 900;
     const contentFrames = totalFrames - ctaFrames;
     const perScene      = Math.floor(contentFrames / Math.max(scenes.length, 1));
@@ -139,7 +140,7 @@ export const MasterTemplate = ({ videoData }) => {
     });
   }
 
-  // وضع الـ CTA بعد نهاية آخر مشهد مباشرة
+  // إضافة الـ CTA
   let ctaStartFrame = 0;
   if (sections.length > 0) {
     const lastSection = sections[sections.length - 1];
@@ -156,7 +157,6 @@ export const MasterTemplate = ({ videoData }) => {
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#0f172a', color: 'white' }}>
-      {/* الاعتماد على Sequence بمواقع بدء مطلقة يضمن التطابق التام مع خط زمني محدد */}
       {sections.map((sec, i) => (
         <Sequence key={i} from={sec.from} durationInFrames={sec.duration}>
           <AbsoluteFill>{sec.component}</AbsoluteFill>
@@ -164,30 +164,4 @@ export const MasterTemplate = ({ videoData }) => {
       ))}
     </AbsoluteFill>
   );
-};
-
-// ── حساب المدة الكلية للفيديو ديناميكياً ─────────────────────────────────────
-export const getTotalDuration = (data) => {
-  if (!data) return 900;
-
-  const ctaFrames = data.ctaDurFrames || 150;
-
-  // 1. إذا كانت توقيتات المشاهد متوفرة من n8n، نحسب المدة الإجمالية بناءً عليها تلقائياً
-  if (data.sceneTimings && data.sceneTimings.length > 0) {
-    const lastTiming = data.sceneTimings[data.sceneTimings.length - 1];
-    const scenesDurationSec = lastTiming.end; // ستكون 36 ثانية في مثالك الحالي
-    const scenesDurationFrames = Math.round(scenesDurationSec * FPS); // 1080 فريم
-    
-    return scenesDurationFrames + ctaFrames; // الإجمالي: 1230 فريم (41 ثانية)
-  }
-
-  // 2. خيارات الاحتياط القديمة في حال غياب التوقيتات
-  const steps = data.steps || [];
-  switch (data.videoType) {
-    case 'workflow':
-    case 'automation':
-      return (steps.length + 1) * 150 + 150;
-    default:
-      return data.totalDurationFrames || 900;
-  }
 };
