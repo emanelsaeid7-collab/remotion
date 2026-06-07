@@ -13,7 +13,6 @@ export const Root = () => {
       height={1920}
       durationInFrames={900}
       calculateMetadata={async ({ props }) => {
-        // ✅ props = { videoData: {...} } — يجب الوصول عبر props.videoData
         const data = props?.videoData || {};
         const ctaFrames = data.ctaDurFrames || 150;
         
