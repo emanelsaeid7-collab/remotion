@@ -23,11 +23,24 @@ const VIDEO_TYPE_MAP = {
 const FPS = 30;
 const PORT = process.env.PORT || 3030;
 
+// ── Helper: قِس مدة ملف صوتي بـ ffprobe ───────────────────────────────────
+async function getAudioDuration(filePath) {
+  try {
+    const { stdout } = await execAsync(
+      `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`
+    );
+    const duration = parseFloat(stdout.trim());
+    return isNaN(duration) ? 0 : duration;
+  } catch (e) {
+    console.error(`[ffprobe] ❌`, e.message);
+    return 0;
+  }
+}
+
 app.post('/render', async (req, res) => {
   const videoData = req.body;
   const { videoType, sceneTimings, audio } = videoData;
 
-  // ✅ تعريف كل المتغيرات أولاً
   const compositionId = VIDEO_TYPE_MAP[videoType] || 'FixVideo';
   const timestamp     = Date.now();
   const baseUrl       = process.env.BASE_URL || `http://localhost:${PORT}`;
@@ -39,35 +52,64 @@ app.post('/render', async (req, res) => {
 
   // ── 1. Save audio ────────────────────────────────────────────────────────
   let hasAudio = false;
+  let audioDurationSec = 0;
+
   if (audio?.base64 && audio.base64.length > 100) {
     try {
       fs.writeFileSync(audioFile, Buffer.from(audio.base64, 'base64'));
       const stats = fs.statSync(audioFile);
       hasAudio = true;
       console.log(`[audio] ✅ Saved — ${stats.size} bytes`);
+
+      // ✅ قِس المدة الفعلية للصوت
+      audioDurationSec = await getAudioDuration(audioFile);
+      console.log(`[audio] ⏱️  Actual duration: ${audioDurationSec}s`);
     } catch (e) {
       console.error(`[audio] ❌`, e.message);
     }
   }
 
-  // ── 2. Calculate duration from sceneTimings ──────────────────────────────
+  // ── 2. Adjust sceneTimings to match ACTUAL audio duration ─────────────────
+  let adjustedTimings = sceneTimings || [];
   let audioSec = 30;
-  if (sceneTimings?.length > 0) {
-    audioSec = sceneTimings[sceneTimings.length - 1].end;
+
+  if (adjustedTimings.length > 0) {
+    const lastTiming = adjustedTimings[adjustedTimings.length - 1];
+    const theoreticalEnd = lastTiming.end;
+
+    // ✅ إذا كان الصوت أطول/أقصر من التوقيتات النظرية، اضبطها بالنسبة
+    if (audioDurationSec > 0 && Math.abs(audioDurationSec - theoreticalEnd) > 0.5) {
+      const scaleFactor = audioDurationSec / theoreticalEnd;
+      console.log(`[timings] 🔄 Scaling by ${scaleFactor.toFixed(3)} (theory=${theoreticalEnd}s, actual=${audioDurationSec}s)`);
+      
+      adjustedTimings = adjustedTimings.map(t => ({
+        ...t,
+        start: parseFloat((t.start * scaleFactor).toFixed(3)),
+        end: parseFloat((t.end * scaleFactor).toFixed(3)),
+      }));
+    }
+    
+    audioSec = adjustedTimings[adjustedTimings.length - 1].end;
+  } else if (audioDurationSec > 0) {
+    audioSec = audioDurationSec;
   }
+
   const totalFrames = Math.ceil(audioSec * FPS);
   console.log(`[render] audio=${audioSec}s | frames=${totalFrames}`);
 
-  // ── 3. Build props (no audio — Remotion renders silent) ──────────────────
+  // ── 3. Build props ────────────────────────────────────────────────────────
   const finalVideoData = { ...videoData };
   delete finalVideoData.audio;
   delete finalVideoData.audioUrl;
+  
+  // ✅ أرسل التوقيتات المُعدّلة والمدة الفعلية
+  finalVideoData.sceneTimings = adjustedTimings;
+  finalVideoData.audioDuration = audioDurationSec;
   finalVideoData.totalDurationFrames = totalFrames;
-  finalVideoData.hookDurFrames       = 0;
-  finalVideoData.ctaDurFrames        = Math.ceil(5 * FPS);
+  finalVideoData.ctaDurFrames = Math.ceil(5 * FPS); // 5 ثواني CTA
 
   console.log('[props] keys:', Object.keys(finalVideoData));
-  fs.writeFileSync(propsFile, JSON.stringify({ videoData: finalVideoData }));
+  fs.writeFileSync(propsFile, JSON.stringify({ videoData: finalVideoData }, null, 2));
 
   const chromePath = process.env.REMOTION_CHROME_EXECUTABLE || '/usr/bin/chromium';
   const entryPoint = path.join(__dirname, 'src', 'Root.jsx');
@@ -100,6 +142,7 @@ app.post('/render', async (req, res) => {
         `-c:a aac`,
         `-map 0:v:0`,
         `-map 1:a:0`,
+        `-shortest`, // ✅ تأكد أن الفيديو لا يتجاوز مدة الصوت
         `"${finalVideo}"`,
       ].join(' ');
 
@@ -114,7 +157,14 @@ app.post('/render', async (req, res) => {
 
     const videoUrl = `${baseUrl}/videos/${videoType}_${timestamp}.mp4`;
     console.log(`[done] ✅ ${videoUrl}`);
-    res.json({ success: true, url: videoUrl, file: `${videoType}_${timestamp}.mp4`, videoType, durationSec: audioSec });
+    res.json({ 
+      success: true, 
+      url: videoUrl, 
+      file: `${videoType}_${timestamp}.mp4`, 
+      videoType, 
+      durationSec: audioSec,
+      audioDuration: audioDurationSec 
+    });
 
   } catch (err) {
     console.error(`[error] ❌`, err.message);
@@ -125,8 +175,8 @@ app.post('/render', async (req, res) => {
   }
 });
 
-app.get('/health', (_, res) => res.json({ status: 'ok', version: '3.1' }));
-app.get('/', (_, res) => res.json({ service: 'Remotion + FFmpeg', version: '3.1' }));
+app.get('/health', (_, res) => res.json({ status: 'ok', version: '3.2' }));
+app.get('/', (_, res) => res.json({ service: 'Remotion + FFmpeg', version: '3.2' }));
 
 app.listen(PORT, () => {
   console.log(`🎬 Server → http://localhost:${PORT}`);
