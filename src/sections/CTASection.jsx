@@ -1,17 +1,19 @@
 import React from 'react';
-import { AbsoluteFill, useCurrentFrame, interpolate, Easing } from 'remotion';
+import { AbsoluteFill, useCurrentFrame, interpolate, Easing, Img } from 'remotion';
 import { COLORS, FONTS, SHADOWS, VIDEO_TYPE_GRADIENTS } from '../styles';
 
 export const CTASection = ({ data }) => {
   const frame = useCurrentFrame();
   const videoType = data?.videoType || 'fix';
   const gradient = VIDEO_TYPE_GRADIENTS[videoType] || VIDEO_TYPE_GRADIENTS.default;
+  const logoPath = data?.logoPath || null;
 
   // Staggered animations
   const bgOpacity = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
   const contentY = interpolate(frame, [5, 20], [60, 0], { extrapolateRight: 'clamp', easing: Easing.out(Easing.cubic) });
   const contentOpacity = interpolate(frame, [5, 20], [0, 1], { extrapolateRight: 'clamp' });
   const buttonScale = interpolate(frame, [15, 25], [0.8, 1], { extrapolateRight: 'clamp', easing: Easing.out(Easing.back(1.7)) });
+  const logoScale = interpolate(frame, [0, 15], [0.5, 1], { extrapolateRight: 'clamp', easing: Easing.out(Easing.back(1.5)) });
 
   return (
     <AbsoluteFill style={{
@@ -37,31 +39,44 @@ export const CTASection = ({ data }) => {
         opacity: bgOpacity,
       }} />
 
-      {/* Logo area */}
+      {/* Logo */}
       <div style={{
         opacity: contentOpacity,
-        transform: `translateY(${contentY}px)`,
+        transform: `translateY(${contentY}px) scale(${logoScale})`,
+        zIndex: 10,
         display: 'flex',
         alignItems: 'center',
-        gap: 16,
-        zIndex: 10,
+        gap: 20,
       }}>
-        <div style={{
-          width: 56,
-          height: 56,
-          borderRadius: 16,
-          background: `linear-gradient(135deg, ${gradient[0]}, ${gradient[1]})`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 28,
-          boxShadow: SHADOWS.md,
-        }}>
-          🚀
-        </div>
+        {logoPath ? (
+          <Img
+            src={logoPath}
+            style={{
+              width: 72,
+              height: 72,
+              borderRadius: 20,
+              objectFit: 'contain',
+              filter: `drop-shadow(0 8px 20px ${gradient[0]}40)`,
+            }}
+          />
+        ) : (
+          <div style={{
+            width: 72,
+            height: 72,
+            borderRadius: 20,
+            background: `linear-gradient(135deg, ${gradient[0]}, ${gradient[1]})`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 36,
+            boxShadow: SHADOWS.md,
+          }}>
+            🚀
+          </div>
+        )}
         <span style={{
           fontFamily: FONTS.heading,
-          fontSize: 36,
+          fontSize: 40,
           fontWeight: 800,
           color: COLORS.text,
           letterSpacing: -1,
@@ -110,14 +125,28 @@ export const CTASection = ({ data }) => {
         <div style={{
           background: `linear-gradient(135deg, ${gradient[0]}, ${gradient[1]})`,
           color: COLORS.white,
-          padding: '20px 48px',
+          padding: '22px 52px',
           borderRadius: 16,
-          fontSize: 22,
+          fontSize: 24,
           fontWeight: 700,
           fontFamily: FONTS.heading,
           boxShadow: `0 10px 30px ${gradient[0]}40, ${SHADOWS.md}`,
           letterSpacing: 0.5,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
         }}>
+          {logoPath && (
+            <Img
+              src={logoPath}
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 8,
+                objectFit: 'contain',
+              }}
+            />
+          )}
           {data?.ctaText || '👉 Visit SmartRemoteGigs.com'}
         </div>
       </div>
@@ -127,7 +156,7 @@ export const CTASection = ({ data }) => {
         opacity: contentOpacity,
         transform: `translateY(${contentY}px)`,
         display: 'flex',
-        gap: 24,
+        gap: 28,
         marginTop: 24,
         zIndex: 10,
       }}>
@@ -136,7 +165,7 @@ export const CTASection = ({ data }) => {
             display: 'flex',
             alignItems: 'center',
             gap: 8,
-            fontSize: 15,
+            fontSize: 16,
             color: COLORS.muted,
             fontWeight: 600,
           }}>
