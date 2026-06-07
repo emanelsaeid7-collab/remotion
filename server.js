@@ -9,7 +9,7 @@ const execAsync = promisify(exec);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
-app.use(express.json({ limit: '50mb' })); // increased for base64 audio
+app.use(express.json({ limit: '50mb' }));
 
 const OUTPUT_DIR = path.join(__dirname, 'output');
 fs.mkdirSync(OUTPUT_DIR, { recursive: true });
@@ -26,7 +26,6 @@ const VIDEO_TYPE_MAP = {
   automation:   'WorkflowVideo',
 };
 
-// ── POST /render ──────────────────────────────────────────────────────────────
 app.post('/render', async (req, res) => {
   const videoData = req.body;
   const { videoType } = videoData;
@@ -36,40 +35,45 @@ app.post('/render', async (req, res) => {
   const filename      = `${videoType}_${timestamp}.mp4`;
   const outputFile    = path.join(OUTPUT_DIR, filename);
   const propsFile     = path.join(OUTPUT_DIR, `props_${timestamp}.json`);
+  const baseUrl       = process.env.BASE_URL || `http://localhost:${PORT}`;
 
-  const baseUrl = process.env.BASE_URL || `http://localhost:${PORT}`;
-
-  // ── Save base64 audio as MP3 file and replace with URL ──────────────────────
   let finalVideoData = { ...videoData };
 
-  if (videoData.audio?.base64) {
+  // ── Handle audio ────────────────────────────────────────────────────────────
+  const audioBase64 = videoData.audio?.base64;
+
+  if (audioBase64 && audioBase64 !== 'filesystem-v2' && audioBase64.length > 100) {
     try {
       const audioFilename = `audio_${timestamp}.mp3`;
       const audioPath     = path.join(OUTPUT_DIR, audioFilename);
-      const audioBuffer   = Buffer.from(videoData.audio.base64, 'base64');
+      const audioBuffer   = Buffer.from(audioBase64, 'base64');
       fs.writeFileSync(audioPath, audioBuffer);
       finalVideoData.audioUrl = `${baseUrl}/audio/${audioFilename}`;
-      delete finalVideoData.audio; // remove base64 to keep props small
       console.log(`[audio] ✅ Saved: ${audioFilename}`);
     } catch (e) {
-      console.error(`[audio] ❌ Failed to save audio:`, e.message);
+      console.error(`[audio] ❌ Failed:`, e.message);
     }
   }
 
+  delete finalVideoData.audio;
   fs.writeFileSync(propsFile, JSON.stringify({ videoData: finalVideoData }));
 
-  const chromePath = process.env.REMOTION_CHROME_EXECUTABLE || '/usr/bin/chromium';
+  const chromePath  = process.env.REMOTION_CHROME_EXECUTABLE || '/usr/bin/chromium';
+  const entryPoint  = path.join(__dirname, 'src', 'Root.jsx');
+
   console.log(`[render] ▶ ${compositionId} — ${new Date().toISOString()}`);
 
   try {
     const cmd = [
       'npx remotion render',
+      `"${entryPoint}"`,
       compositionId,
       `"${outputFile}"`,
       `--props="${propsFile}"`,
       `--browser-executable="${chromePath}"`,
     ].join(' ');
 
+    console.log(`[render] CMD: ${cmd}`);
     await execAsync(cmd, { cwd: __dirname, timeout: 10 * 60 * 1000 });
     fs.unlinkSync(propsFile);
 
@@ -85,7 +89,7 @@ app.post('/render', async (req, res) => {
 });
 
 app.get('/health', (_, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
-app.get('/', (_, res) => res.json({ service: 'Remotion Master Template', version: '2.0' }));
+app.get('/', (_, res) => res.json({ service: 'Remotion Master Template', version: '2.1' }));
 
 const PORT = process.env.PORT || 3030;
 app.listen(PORT, () => {
