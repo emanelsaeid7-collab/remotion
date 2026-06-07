@@ -10,7 +10,7 @@ const HookSlide = ({ data }) => {
   const frame = useCurrentFrame();
   const videoType = data?.videoType || 'fix';
   const gradient = VIDEO_TYPE_GRADIENTS[videoType] || VIDEO_TYPE_GRADIENTS.default;
-  const logoPath = data?.logoPath || null;
+  const logoBase64 = data?.logoBase64 || null;
 
   const opacity = interpolate(frame, [0, 10], [0, 1], { extrapolateRight: 'clamp' });
   const scale = interpolate(frame, [0, 15], [0.8, 1], { extrapolateRight: 'clamp', easing: Easing.out(Easing.back(1.5)) });
@@ -43,9 +43,9 @@ const HookSlide = ({ data }) => {
         gap: 24,
       }}>
         {/* Logo */}
-        {logoPath ? (
+        {logoBase64 ? (
           <Img
-            src={logoPath}
+            src={logoBase64}
             style={{
               width: 120,
               height: 120,
@@ -385,7 +385,7 @@ export const MasterTemplate = ({ videoData }) => {
   const scenes = data.scenes || data.solution || [];
   const ctaFrames = data.ctaDurFrames || 150;
   const videoType = data.videoType || 'fix';
-  const hookFrames = Math.ceil(2 * FPS); // 2 seconds intro
+  const hookFrames = Math.ceil(2 * FPS);
 
   console.log("--- DIAGNOSTIC ---");
   console.log("sceneTimings count:", sceneTimings.length);
@@ -393,7 +393,7 @@ export const MasterTemplate = ({ videoData }) => {
   console.log("audioDuration:", data.audioDuration);
   console.log("totalDurationFrames:", data.totalDurationFrames);
   console.log("videoType:", videoType);
-  console.log("logoPath:", data.logoPath);
+  console.log("logoBase64:", data.logoBase64 ? `✅ ${data.logoBase64.length} chars` : '❌ null');
   console.log("voiceId:", data.voiceId);
   console.log("------------------");
 
