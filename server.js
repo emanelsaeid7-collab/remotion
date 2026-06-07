@@ -19,19 +19,19 @@ fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 app.use('/videos', express.static(OUTPUT_DIR));
 
 const VIDEO_TYPE_MAP = {
-  fix:        'FixVideo',
-  comparison: 'ComparisonVideo',
-  workflow:   'WorkflowVideo',
+  fix:          'FixVideo',
+  error:        'ErrorVideo',
+  comparison:   'ComparisonVideo',
+  workflow:     'WorkflowVideo',
+  productivity: 'ProductivityVideo',
+  freelancing:  'FreelancingVideo',
+  automation:   'AutomationVideo',
 };
 
-// ── POST /render ─────────────────────────────────────────────────────────────
-app.post('/render', async (req, res) => {
-  const videoData = req.body;
-  const { videoType } = videoData;
-
+// ... inside app.post('/render') ...
   if (!VIDEO_TYPE_MAP[videoType]) {
     return res.status(400).json({
-      error: `videoType غير صحيح. الأنواع المتاحة: fix | comparison | workflow`,
+      error: `Invalid videoType. Available types: ${Object.keys(VIDEO_TYPE_MAP).join(' | ')}`,
     });
   }
 
