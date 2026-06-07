@@ -1,11 +1,130 @@
 import React from 'react';
-import { AbsoluteFill, Sequence, useCurrentFrame, useVideoConfig, interpolate, Easing } from 'remotion';
+import { AbsoluteFill, Sequence, useCurrentFrame, useVideoConfig, interpolate, Easing, Img } from 'remotion';
 import { CTASection } from './sections/CTASection';
 import { COLORS, FONTS, SHADOWS, VIDEO_TYPE_ICONS, VIDEO_TYPE_LABELS, VIDEO_TYPE_GRADIENTS } from './styles';
 
 const FPS = 30;
 
-// ── Helper: Progress Bar ────────────────────────────────────────────────────
+// ── Hook / Intro Slide (0-2 seconds) ────────────────────────────────────────
+const HookSlide = ({ data }) => {
+  const frame = useCurrentFrame();
+  const videoType = data?.videoType || 'fix';
+  const gradient = VIDEO_TYPE_GRADIENTS[videoType] || VIDEO_TYPE_GRADIENTS.default;
+  const logoPath = data?.logoPath || null;
+
+  const opacity = interpolate(frame, [0, 10], [0, 1], { extrapolateRight: 'clamp' });
+  const scale = interpolate(frame, [0, 15], [0.8, 1], { extrapolateRight: 'clamp', easing: Easing.out(Easing.back(1.5)) });
+  const slideY = interpolate(frame, [0, 12], [30, 0], { extrapolateRight: 'clamp', easing: Easing.out(Easing.cubic) });
+  const fadeOut = interpolate(frame, [45, 60], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+
+  return (
+    <AbsoluteFill style={{
+      backgroundColor: COLORS.bg,
+      justifyContent: 'center',
+      alignItems: 'center',
+      flexDirection: 'column',
+      gap: 28,
+      fontFamily: FONTS.body,
+    }}>
+      {/* Background */}
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        background: `radial-gradient(circle at 50% 40%, ${gradient[0]}12 0%, ${gradient[1]}08 40%, transparent 70%)`,
+      }} />
+
+      <div style={{
+        opacity: opacity * fadeOut,
+        transform: `translateY(${slideY}px) scale(${scale})`,
+        zIndex: 10,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 24,
+      }}>
+        {/* Logo */}
+        {logoPath ? (
+          <Img
+            src={logoPath}
+            style={{
+              width: 120,
+              height: 120,
+              borderRadius: 32,
+              objectFit: 'contain',
+              filter: `drop-shadow(0 12px 30px ${gradient[0]}50)`,
+            }}
+          />
+        ) : (
+          <div style={{
+            width: 120,
+            height: 120,
+            borderRadius: 32,
+            background: `linear-gradient(135deg, ${gradient[0]}, ${gradient[1]})`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 60,
+            boxShadow: SHADOWS.lg,
+          }}>
+            🚀
+          </div>
+        )}
+
+        {/* Brand name */}
+        <div style={{
+          fontFamily: FONTS.heading,
+          fontSize: 48,
+          fontWeight: 800,
+          color: COLORS.text,
+          letterSpacing: -1,
+          textAlign: 'center',
+        }}>
+          SmartRemoteGigs
+        </div>
+
+        {/* Tagline */}
+        <div style={{
+          fontSize: 24,
+          color: COLORS.muted,
+          fontWeight: 500,
+          textAlign: 'center',
+          maxWidth: 700,
+          lineHeight: 1.4,
+        }}>
+          {data?.title || 'Solve problems. Work smarter. Grow faster.'}
+        </div>
+
+        {/* Type badge */}
+        <div style={{
+          marginTop: 8,
+          background: `linear-gradient(135deg, ${gradient[0]}15, ${gradient[1]}15)`,
+          border: `1.5px solid ${gradient[0]}30`,
+          padding: '10px 28px',
+          borderRadius: 100,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+        }}>
+          <span style={{ fontSize: 22 }}>
+            {VIDEO_TYPE_ICONS[videoType] || VIDEO_TYPE_ICONS.default}
+          </span>
+          <span style={{
+            fontFamily: FONTS.heading,
+            fontSize: 16,
+            fontWeight: 700,
+            color: gradient[0],
+            letterSpacing: 1.5,
+            textTransform: 'uppercase',
+          }}>
+            {VIDEO_TYPE_LABELS[videoType] || VIDEO_TYPE_LABELS.default}
+          </span>
+        </div>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+// ── Progress Bar ──────────────────────────────────────────────────────────────
 const ProgressBar = ({ currentScene, totalScenes, progress, accent }) => {
   return (
     <div style={{
@@ -27,7 +146,6 @@ const ProgressBar = ({ currentScene, totalScenes, progress, accent }) => {
         borderRadius: 100,
         transition: 'width 0.1s linear',
       }} />
-      {/* Scene dots */}
       <div style={{
         position: 'absolute',
         top: -5,
@@ -53,8 +171,8 @@ const ProgressBar = ({ currentScene, totalScenes, progress, accent }) => {
   );
 };
 
-// ── Helper: Type Badge ─────────────────────────────────────────────────────────
-const TypeBadge = ({ videoType, delay }) => {
+// ── Type Badge (floating top) ─────────────────────────────────────────────────
+const TypeBadge = ({ videoType }) => {
   const frame = useCurrentFrame();
   const opacity = interpolate(frame, [0, 10], [0, 1], { extrapolateRight: 'clamp' });
   const translateY = interpolate(frame, [0, 10], [-20, 0], { extrapolateRight: 'clamp' });
@@ -95,24 +213,20 @@ const TypeBadge = ({ videoType, delay }) => {
   );
 };
 
-// ── Single Scene Renderer ───────────────────────────────────────────────────────
+// ── Single Scene Renderer ─────────────────────────────────────────────────────
 const SceneSlide = ({ scene, index, total, videoType, sceneDuration }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  // Animation timings
   const fadeIn = interpolate(frame, [0, 12], [0, 1], { extrapolateRight: 'clamp', easing: Easing.out(Easing.cubic) });
   const slideUp = interpolate(frame, [0, 12], [50, 0], { extrapolateRight: 'clamp', easing: Easing.out(Easing.cubic) });
   const scaleIn = interpolate(frame, [0, 12], [0.92, 1], { extrapolateRight: 'clamp', easing: Easing.out(Easing.back(1.5)) });
 
-  // Subtle float animation
   const float = interpolate(frame, [0, fps * 2], [0, -8], { extrapolateRight: 'extend' });
   const floatCycle = Math.sin(float / 10) * 5;
 
   const gradient = VIDEO_TYPE_GRADIENTS[videoType] || VIDEO_TYPE_GRADIENTS.default;
   const accent = gradient[0];
-
-  // Progress for this scene (0 to 1)
   const sceneProgress = Math.min(frame / sceneDuration, 1);
 
   return (
@@ -125,7 +239,7 @@ const SceneSlide = ({ scene, index, total, videoType, sceneDuration }) => {
       gap: 36,
       fontFamily: FONTS.body,
     }}>
-      {/* Soft gradient background orb */}
+      {/* Soft gradient orb */}
       <div style={{
         position: 'absolute',
         top: '15%',
@@ -139,7 +253,7 @@ const SceneSlide = ({ scene, index, total, videoType, sceneDuration }) => {
         zIndex: 1,
       }} />
 
-      {/* Decorative grid pattern */}
+      {/* Grid pattern */}
       <div style={{
         position: 'absolute',
         inset: 0,
@@ -149,7 +263,7 @@ const SceneSlide = ({ scene, index, total, videoType, sceneDuration }) => {
         zIndex: 1,
       }} />
 
-      {/* Scene number pill */}
+      {/* Step pill */}
       <div style={{
         opacity: fadeIn,
         transform: `scale(${scaleIn})`,
@@ -167,7 +281,7 @@ const SceneSlide = ({ scene, index, total, videoType, sceneDuration }) => {
         STEP {index + 1} / {total}
       </div>
 
-      {/* Main content card */}
+      {/* Content card */}
       <div style={{
         opacity: fadeIn,
         transform: `translateY(${slideUp}px)`,
@@ -182,7 +296,6 @@ const SceneSlide = ({ scene, index, total, videoType, sceneDuration }) => {
         position: 'relative',
         overflow: 'hidden',
       }}>
-        {/* Accent top border */}
         <div style={{
           position: 'absolute',
           top: 0,
@@ -192,7 +305,6 @@ const SceneSlide = ({ scene, index, total, videoType, sceneDuration }) => {
           background: `linear-gradient(90deg, ${gradient[0]}, ${gradient[1]})`,
         }} />
 
-        {/* Scene title */}
         <h2 style={{
           margin: 0,
           fontSize: 48,
@@ -206,7 +318,6 @@ const SceneSlide = ({ scene, index, total, videoType, sceneDuration }) => {
           {scene.title || scene.text || ''}
         </h2>
 
-        {/* Scene detail / subtitle */}
         {scene.detail && (
           <p style={{
             margin: '24px 0 0',
@@ -220,7 +331,6 @@ const SceneSlide = ({ scene, index, total, videoType, sceneDuration }) => {
           </p>
         )}
 
-        {/* Search terms as tags */}
         {scene.searchTerms && Array.isArray(scene.searchTerms) && scene.searchTerms.length > 0 && (
           <div style={{
             marginTop: 32,
@@ -247,7 +357,7 @@ const SceneSlide = ({ scene, index, total, videoType, sceneDuration }) => {
         )}
       </div>
 
-      {/* Bottom tip indicator */}
+      {/* Footer brand */}
       <div style={{
         opacity: fadeIn * 0.7,
         fontSize: 16,
@@ -255,14 +365,18 @@ const SceneSlide = ({ scene, index, total, videoType, sceneDuration }) => {
         fontWeight: 500,
         zIndex: 10,
         marginTop: 8,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
       }}>
-        💡 SmartRemoteGigs • Work Smarter
+        <span>🚀</span>
+        <span>SmartRemoteGigs • Work Smarter</span>
       </div>
     </AbsoluteFill>
   );
 };
 
-// ── Master Template ───────────────────────────────────────────────────────────
+// ── Master Template ─────────────────────────────────────────────────────────
 export const MasterTemplate = ({ videoData }) => {
   const data = videoData || { videoType: 'fix', title: 'Example', solution: [] };
   const { fps } = useVideoConfig();
@@ -271,23 +385,33 @@ export const MasterTemplate = ({ videoData }) => {
   const scenes = data.scenes || data.solution || [];
   const ctaFrames = data.ctaDurFrames || 150;
   const videoType = data.videoType || 'fix';
+  const hookFrames = Math.ceil(2 * FPS); // 2 seconds intro
 
-  // ✅ Diagnostic logs (maintained)
   console.log("--- DIAGNOSTIC ---");
   console.log("sceneTimings count:", sceneTimings.length);
   console.log("scenes count:", scenes.length);
   console.log("audioDuration:", data.audioDuration);
   console.log("totalDurationFrames:", data.totalDurationFrames);
   console.log("videoType:", videoType);
+  console.log("logoPath:", data.logoPath);
+  console.log("voiceId:", data.voiceId);
   console.log("------------------");
 
   let sections = [];
   let totalContentFrames = 0;
 
+  // 1. HOOK / INTRO (first 2 seconds)
+  sections.push({
+    component: <HookSlide data={data} />,
+    from: 0,
+    duration: hookFrames,
+  });
+
+  // 2. SCENES
   if (sceneTimings.length > 0 && scenes.length > 0) {
     sceneTimings.forEach((timing, i) => {
       const scene = scenes[i] || scenes[scenes.length - 1];
-      
+
       const startFrame = Math.round(timing.start * FPS);
       const endFrame = Math.round(timing.end * FPS);
       const durFrames = Math.max(endFrame - startFrame, 1);
@@ -298,7 +422,7 @@ export const MasterTemplate = ({ videoData }) => {
       sections.push({
         component: (
           <>
-            <TypeBadge videoType={videoType} delay={startFrame} />
+            <TypeBadge videoType={videoType} />
             <SceneSlide 
               scene={scene} 
               index={i} 
@@ -319,9 +443,8 @@ export const MasterTemplate = ({ videoData }) => {
       });
     });
   } else {
-    // Fallback
     const totalFrames = data.totalDurationFrames || 900;
-    const contentFrames = totalFrames - ctaFrames;
+    const contentFrames = totalFrames - ctaFrames - hookFrames;
     const perScene = Math.floor(contentFrames / Math.max(scenes.length, 1));
     totalContentFrames = contentFrames;
 
@@ -329,7 +452,7 @@ export const MasterTemplate = ({ videoData }) => {
       sections.push({
         component: (
           <>
-            <TypeBadge videoType={videoType} delay={i * perScene} />
+            <TypeBadge videoType={videoType} />
             <SceneSlide 
               scene={scene} 
               index={i} 
@@ -345,21 +468,20 @@ export const MasterTemplate = ({ videoData }) => {
             />
           </>
         ),
-        from: i * perScene,
+        from: hookFrames + (i * perScene),
         duration: perScene,
       });
     });
   }
 
-  // CTA starts right after last scene
-  const ctaStartFrame = totalContentFrames;
-
+  // 3. CTA
+  const ctaStartFrame = Math.max(totalContentFrames, hookFrames);
   console.log(`[CTA] startFrame=${ctaStartFrame}, duration=${ctaFrames}`);
 
   sections.push({
     component: (
       <>
-        <TypeBadge videoType={videoType} delay={ctaStartFrame} />
+        <TypeBadge videoType={videoType} />
         <CTASection data={data} />
       </>
     ),
@@ -378,23 +500,23 @@ export const MasterTemplate = ({ videoData }) => {
   );
 };
 
-// ── Duration Calculator (maintained) ────────────────────────────────────────────
 export const getTotalDuration = (data) => {
   if (!data) return 900;
 
   const ctaFrames = data.ctaDurFrames || 150;
+  const hookFrames = Math.ceil(2 * FPS);
 
   if (data.sceneTimings && data.sceneTimings.length > 0) {
     const lastTiming = data.sceneTimings[data.sceneTimings.length - 1];
     const scenesDurationFrames = Math.round(lastTiming.end * FPS);
-    return scenesDurationFrames + ctaFrames;
+    return scenesDurationFrames + ctaFrames + hookFrames;
   }
 
   const steps = data.steps || [];
   switch (data.videoType) {
     case 'workflow':
     case 'automation':
-      return (steps.length + 1) * 150 + 150;
+      return (steps.length + 1) * 150 + 150 + hookFrames;
     default:
       return data.totalDurationFrames || 900;
   }
