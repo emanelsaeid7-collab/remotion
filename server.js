@@ -11,6 +11,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(express.json({ limit: '10mb' }));
 
+const PORT = process.env.PORT || 3030;
+
 // Serve rendered videos as static files
 const OUTPUT_DIR = path.join(__dirname, 'output');
 fs.mkdirSync(OUTPUT_DIR, { recursive: true });
@@ -48,6 +50,7 @@ app.post('/render', async (req, res) => {
   try {
     const cmd = [
       'npx remotion render',
+      'src/Root.jsx',           // <--- تم إضافة نقطة البداية هنا ✅
       compositionId,
       `"${outputFile}"`,
       `--props="${propsFile}"`,
@@ -88,7 +91,6 @@ app.get('/', (_, res) => res.json({
   },
 }));
 
-const PORT = process.env.PORT || 3030;
 app.listen(PORT, () => {
   console.log(`🎬 Remotion Render Server → http://localhost:${PORT}`);
   console.log(`🌍 Public URL: ${process.env.BASE_URL || '(set BASE_URL env var in Coolify)'}`);
