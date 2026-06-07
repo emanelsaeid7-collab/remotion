@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "npx remotion studio",
-    "render:fix": "npx remotion render FixVideo output/fix.mp4",
-    "render:comparison": "npx remotion render ComparisonVideo output/comparison.mp4",
-    "render:workflow": "npx remotion render WorkflowVideo output/workflow.mp4",
+    "render:fix": "npx remotion render src/Root.jsx FixVideo output/fix.mp4",
+    "render:comparison": "npx remotion render src/Root.jsx ComparisonVideo output/comparison.mp4",
+    "render:workflow": "npx remotion render src/Root.jsx WorkflowVideo output/workflow.mp4",
     "server": "node server.js"
   },
   "dependencies": {
