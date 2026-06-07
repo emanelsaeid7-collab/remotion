@@ -16,27 +16,27 @@ import { RedFlagsSection, AdviceSection } from './sections/FreelancingSection';
 import { AutomationTriggerSection, AutomationActionsSection } from './sections/AutomationSection';
 
 // Duration constants (in frames at 30fps)
-const HOOK_DUR = 90;         // 3s
-const CTA_DUR = 90;          // 3s
+const HOOK_DUR = 150;         // 5s
+const CTA_DUR = 150;          // 5s
 
 // Specific section durations
-const PROBLEM_DUR = 120;     // 4s
-const SOLUTION_DUR = 150;    // 5s
-const COMPARISON_DUR = 150;  // 5s
-const WINNER_DUR = 90;       // 3s
-const WORKFLOW_STEP_DUR = 120; // 4s
+const PROBLEM_DUR = 240;     // 8s
+const SOLUTION_DUR = 360;    // 12s
+const COMPARISON_DUR = 300;  // 10s
+const WINNER_DUR = 180;       // 6s
+const WORKFLOW_STEP_DUR = 150; // 5s
 
-const ERROR_LOG_DUR = 120;   // 4s
-const ERROR_FIX_DUR = 150;   // 5s
+const ERROR_LOG_DUR = 210;   // 7s
+const ERROR_FIX_DUR = 300;   // 10s
 
-const CONCEPT_DUR = 120;     // 4s
-const TIPS_DUR = 150;        // 5s
+const CONCEPT_DUR = 210;     // 7s
+const TIPS_DUR = 300;        // 10s
 
-const RED_FLAGS_DUR = 120;   // 4s
-const ADVICE_DUR = 120;      // 4s
+const RED_FLAGS_DUR = 240;   // 8s
+const ADVICE_DUR = 210;      // 7s
 
-const TRIGGER_DUR = 90;      // 3s
-const ACTIONS_DUR = 150;     // 5s
+const TRIGGER_DUR = 180;      // 6s
+const ACTIONS_DUR = 300;     // 10s
 
 /**
  * Build the series items based on videoType
