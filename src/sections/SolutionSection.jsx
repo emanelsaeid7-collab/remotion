@@ -11,10 +11,10 @@ export const SolutionSection = ({ data }) => {
   return (
     <div style={{ ...baseContainer }}>
       <AnimatedBG accentColor={COLORS.accent} />
-
       <div style={{ zIndex: 10, width: '100%', maxWidth: 1000, padding: '0 60px' }}>
+
         <AnimText delay={0} duration={15} style={{ marginBottom: 30 }}>
-          <GlowBadge color={COLORS.accent} delay={0}>✅ الحل</GlowBadge>
+          <GlowBadge color={COLORS.accent} delay={0}>✅ The Fix</GlowBadge>
         </AnimText>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -30,7 +30,7 @@ export const SolutionSection = ({ data }) => {
                 alignItems: 'flex-start',
                 gap: 20,
                 background: COLORS.bgGlass,
-                border: `1px solid ${COLORS.accent}${Math.floor(progress * 88).toString(16).padStart(2,'0')}`,
+                border: `1px solid ${COLORS.accent}${Math.floor(progress * 88).toString(16).padStart(2, '0')}`,
                 borderRadius: 16,
                 padding: '20px 30px',
                 opacity: progress,
@@ -56,15 +56,22 @@ export const SolutionSection = ({ data }) => {
 
                 {/* Step text */}
                 <div style={{
-                  fontSize: typeof step === 'string' ? 20 : 18,
+                  fontSize: 19,
                   color: COLORS.text,
-                  lineHeight: 1.6,
-                  paddingTop: 10,
+                  lineHeight: 1.65,
+                  paddingTop: 8,
+                  fontFamily: '"Inter", "Segoe UI", sans-serif',
                 }}>
                   {typeof step === 'string' ? step : (
                     <>
-                      <div style={{ fontWeight: 700, marginBottom: 4 }}>{step.title}</div>
-                      {step.detail && <div style={{ color: COLORS.textMuted, fontSize: 16 }}>{step.detail}</div>}
+                      <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 20 }}>
+                        {step.title}
+                      </div>
+                      {step.detail && (
+                        <div style={{ color: COLORS.textMuted, fontSize: 15 }}>
+                          {step.detail}
+                        </div>
+                      )}
                       {step.code && (
                         <div style={{
                           background: '#1A1A2E',
