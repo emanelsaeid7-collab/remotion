@@ -1,5 +1,6 @@
 import React from 'react';
 import { AbsoluteFill, Series } from 'remotion';
+import { AbsoluteFill, Series, Audio } from 'remotion';
 
 // Existing Imports
 import { HookSection } from './sections/HookSection';
@@ -128,6 +129,9 @@ export const MasterTemplate = ({ videoData }) => {
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#0f172a', color: 'white' }}>
+      
+      {data.audioUrl && <Audio src={data.audioUrl} />}
+
       <Series>
         {sections.map((sec, i) => (
           <Series.Sequence key={i} durationInFrames={sec.duration}>
@@ -135,6 +139,7 @@ export const MasterTemplate = ({ videoData }) => {
           </Series.Sequence>
         ))}
       </Series>
+      
     </AbsoluteFill>
   );
 };
