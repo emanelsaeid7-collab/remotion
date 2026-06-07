@@ -9,8 +9,8 @@ export const Root = () => {
       id="FixVideo" // يجب أن يطابق الاسم المكتوب في أمر الرندر على السيرفر تماماً
       component={MasterTemplate}
       fps={FPS}
-      width={1920}
-      height={1080}
+      width={1080}
+      height={1920}
       durationInFrames={900}
       calculateMetadata={async ({ props }) => {
         const ctaFrames = props.ctaDurFrames || 150;
