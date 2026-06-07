@@ -64,6 +64,21 @@ async function ensureLogo() {
   return logoPath;
 }
 
+// ── Helper: Read logo as base64 data URI ───────────────────────────────────
+async function getLogoBase64() {
+  const logoPath = await ensureLogo();
+  if (!logoPath) return null;
+
+  try {
+    const buffer = fs.readFileSync(logoPath);
+    const base64 = buffer.toString('base64');
+    return `data:image/webp;base64,${base64}`;
+  } catch (e) {
+    console.error('[assets] ❌ Failed to read logo:', e.message);
+    return null;
+  }
+}
+
 // ── Helper: Measure audio duration ───────────────────────────────────────────
 async function getAudioDuration(filePath) {
   try {
@@ -91,8 +106,8 @@ app.post('/render', async (req, res) => {
   const finalVideo  = path.join(OUTPUT_DIR, `${videoType}_${timestamp}.mp4`);
   const propsFile   = path.join(OUTPUT_DIR, `props_${timestamp}.json`);
 
-  // ── 1. Ensure logo is available ───────────────────────────────────────────
-  const logoPath = await ensureLogo();
+  // ── 1. Get logo as base64 ─────────────────────────────────────────────────
+  const logoBase64 = await getLogoBase64();
 
   // ── 2. Save audio ─────────────────────────────────────────────────────────
   let hasAudio = false;
@@ -148,11 +163,11 @@ app.post('/render', async (req, res) => {
   finalVideoData.audioDuration = audioDurationSec;
   finalVideoData.totalDurationFrames = totalFrames;
   finalVideoData.ctaDurFrames = Math.ceil(5 * FPS);
-  // ✅ Use absolute file path with file:// protocol for Remotion
-  finalVideoData.logoPath = logoPath ? `file://${logoPath}` : null;
+  // ✅ Pass logo as base64 data URI — works in any browser environment
+  finalVideoData.logoBase64 = logoBase64;
   finalVideoData.voiceId = voice_id || 'XN5MUfNpmfCV6rvigVhs';
 
-  console.log('[props] logoPath:', finalVideoData.logoPath);
+  console.log('[props] logoBase64:', logoBase64 ? `✅ ${logoBase64.length} chars` : '❌ null');
   console.log('[props] keys:', Object.keys(finalVideoData));
   fs.writeFileSync(propsFile, JSON.stringify({ videoData: finalVideoData }, null, 2));
 
@@ -221,8 +236,8 @@ app.post('/render', async (req, res) => {
   }
 });
 
-app.get('/health', (_, res) => res.json({ status: 'ok', version: '3.4' }));
-app.get('/', (_, res) => res.json({ service: 'Remotion + FFmpeg + SmartRemoteGigs', version: '3.4' }));
+app.get('/health', (_, res) => res.json({ status: 'ok', version: '3.5' }));
+app.get('/', (_, res) => res.json({ service: 'Remotion + FFmpeg + SmartRemoteGigs', version: '3.5' }));
 
 app.listen(PORT, () => {
   console.log(`🎬 SmartRemoteGigs Video Server → http://localhost:${PORT}`);
