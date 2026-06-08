@@ -3,8 +3,8 @@ FROM node:20-slim
 # Install system dependencies
 RUN apt-get update && apt-get install -y     chromium     ffmpeg     fonts-noto     fonts-noto-cjk     ca-certificates     python3     python3-pip     python3-venv     --no-install-recommends     && rm -rf /var/lib/apt/lists/*
 
-# Install Kokoro TTS using python3 -m pip (more reliable)
-RUN python3 -m pip install --upgrade pip &&     python3 -m pip install kokoro-onnx soundfile
+# Install Kokoro TTS (using --break-system-packages for Docker containers)
+RUN python3 -m pip install --break-system-packages kokoro-onnx soundfile
 
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV REMOTION_CHROME_EXECUTABLE=/usr/bin/chromium
