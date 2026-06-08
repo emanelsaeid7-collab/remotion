@@ -1,6 +1,5 @@
 FROM node:20-slim
 
-# Install system dependencies + Python + venv
 RUN apt-get update && apt-get install -y \
     chromium \
     ffmpeg \
@@ -9,18 +8,11 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     python3 \
     python3-pip \
-    python3-venv \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-# ✅ Create Python venv and install Kokoro TTS during BUILD (reliable)
-RUN python3 -m venv /opt/venv && \
-    /opt/venv/bin/pip install --upgrade pip && \
-    /opt/venv/bin/pip install kokoro-onnx soundfile
-
-# Set venv path for Node.js to use
-ENV VENV_PATH=/opt/venv
-ENV PATH="/opt/venv/bin:${PATH}"
+# ✅ Simplest: Install Kokoro directly to system Python (safe in Docker)
+RUN python3 -m pip install --break-system-packages kokoro-onnx soundfile
 
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV REMOTION_CHROME_EXECUTABLE=/usr/bin/chromium
@@ -33,11 +25,6 @@ RUN npm ci --omit=dev
 COPY . .
 
 RUN mkdir -p output assets
-
-# Download background music (royalty-free)
-RUN curl -L -o /app/assets/bg-music-1.mp3 "https://files.freemusicarchive.org/storage-freemusicarchive-org/music/no_curator/Tours/Enthusiast/Tours_-_01_-_Enthusiast.mp3" || true
-RUN curl -L -o /app/assets/bg-music-2.mp3 "https://files.freemusicarchive.org/storage-freemusicarchive-org/music/ccCommunity/Chad_Crouch/Arps/Chad_Crouch_-_Algorithms.mp3" || true
-RUN curl -L -o /app/assets/bg-music-3.mp3 "https://files.freemusicarchive.org/storage-freemusicarchive-org/music/no_curator/Komiku/Its_time_for_adventure/Komiku_-_03_-_Battle_of_Pogs.mp3" || true
 
 EXPOSE 3030
 
