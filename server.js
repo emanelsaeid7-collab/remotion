@@ -99,10 +99,9 @@ app.post('/render', async (req, res) => {
   let hasAudio = false;
   let audioDurationSec = 0;
 
-  console.log('=== AUDIO RECEIVED ===');
-  console.log('audio?.base64 exists:', !!audio?.base64);
+  console.log('=== AUDIO CHECK ===');
+  console.log('audio?.base64 exists:', !!(audio && audio.base64));
   console.log('audio?.base64 length:', audio?.base64?.length || 0);
-  console.log('audio?.base64 first 50:', audio?.base64?.substring(0, 50) || 'EMPTY');
 
   if (audio?.base64 && audio.base64.length > 100) {
     try {
@@ -121,7 +120,7 @@ app.post('/render', async (req, res) => {
       hasAudio = false;
     }
   } else {
-    console.log(`[audio] ⚠️  No valid audio base64`);
+    console.log(`[audio] ⚠️  No valid audio (length: ${audio?.base64?.length || 0})`);
   }
 
   // ── 2. Adjust sceneTimings ────────────────────────────────────────────────
@@ -146,15 +145,10 @@ app.post('/render', async (req, res) => {
     audioSec = audioDurationSec;
   }
 
-  // ── 3. Calculate total duration (scenes + hook + CTA) ────────────────────
-  const hookFrames = Math.ceil(2 * FPS);   // 2s intro
-  const ctaFrames = Math.ceil(5 * FPS);    // 5s CTA
-  const scenesDurationFrames = Math.ceil(audioSec * FPS);
-  const totalFrames = scenesDurationFrames + hookFrames + ctaFrames;
+  const totalFrames = Math.ceil(audioSec * FPS);
+  console.log(`[render] audio=${audioSec}s | frames=${totalFrames}`);
 
-  console.log(`[duration] scenes=${scenesDurationFrames} + hook=${hookFrames} + cta=${ctaFrames} = ${totalFrames}`);
-
-  // ── 4. Build props ────────────────────────────────────────────────────────
+  // ── 3. Build props ────────────────────────────────────────────────────────
   const finalVideoData = { ...videoData };
   delete finalVideoData.audio;
   delete finalVideoData.audioUrl;
@@ -162,8 +156,7 @@ app.post('/render', async (req, res) => {
   finalVideoData.sceneTimings = adjustedTimings;
   finalVideoData.audioDuration = audioDurationSec;
   finalVideoData.totalDurationFrames = totalFrames;
-  finalVideoData.hookDurFrames = hookFrames;
-  finalVideoData.ctaDurFrames = ctaFrames;
+  finalVideoData.ctaDurFrames = Math.ceil(5 * FPS);
   finalVideoData.logoBase64 = logoBase64;
   finalVideoData.voiceId = voice_id || 'cgSgspJ2msm6clMCkdW9';
 
@@ -173,7 +166,7 @@ app.post('/render', async (req, res) => {
   const entryPoint = path.join(__dirname, 'src', 'Root.jsx');
 
   try {
-    // ── 5. Render silent video ────────────────────────────────────────────
+    // ── 4. Render silent video ────────────────────────────────────────────
     const renderCmd = [
       'npx remotion render',
       `"${entryPoint}"`,
@@ -189,13 +182,9 @@ app.post('/render', async (req, res) => {
     fs.unlinkSync(propsFile);
     console.log(`[render] ✅ Silent video done`);
 
-    // ── 6. Merge with FFmpeg ──────────────────────────────────────────────
+    // ── 5. Merge with FFmpeg ──────────────────────────────────────────────
     if (hasAudio) {
       console.log(`[ffmpeg] ▶ Merging audio + video...`);
-      console.log(`[ffmpeg] video: ${silentVideo} (${fs.statSync(silentVideo).size} bytes)`);
-      console.log(`[ffmpeg] audio: ${audioFile} (${fs.statSync(audioFile).size} bytes)`);
-
-      // ✅ NO -shortest — let video run full duration, audio plays naturally
       const ffmpegCmd = [
         'ffmpeg -y',
         `-i "${silentVideo}"`,
@@ -205,20 +194,14 @@ app.post('/render', async (req, res) => {
         `-b:a 192k`,
         `-map 0:v:0`,
         `-map 1:a:0`,
-        `-af "volume=1.0"`,
+        `-shortest`,
         `"${finalVideo}"`,
       ].join(' ');
 
-      console.log(`[ffmpeg] cmd: ${ffmpegCmd.substring(0, 200)}...`);
-
-      const { stdout, stderr } = await execAsync(ffmpegCmd, { timeout: 5 * 60 * 1000 });
-      if (stderr) console.log('[ffmpeg] log:', stderr.substring(0, 300));
-
+      await execAsync(ffmpegCmd, { timeout: 5 * 60 * 1000 });
       fs.unlinkSync(silentVideo);
       fs.unlinkSync(audioFile);
-
-      const finalStats = fs.statSync(finalVideo);
-      console.log(`[ffmpeg] ✅ Final video: ${finalStats.size} bytes`);
+      console.log(`[ffmpeg] ✅ Merge done`);
     } else {
       console.log(`[render] ⚠️  No audio — video only`);
       fs.renameSync(silentVideo, finalVideo);
@@ -232,9 +215,8 @@ app.post('/render', async (req, res) => {
       file: `${videoType}_${timestamp}.mp4`, 
       videoType, 
       durationSec: audioSec,
-      totalFrames,
-      hasAudio,
       audioDuration: audioDurationSec,
+      hasAudio,
     });
 
   } catch (err) {
@@ -246,8 +228,8 @@ app.post('/render', async (req, res) => {
   }
 });
 
-app.get('/health', (_, res) => res.json({ status: 'ok', version: '3.7' }));
-app.get('/', (_, res) => res.json({ service: 'Remotion + FFmpeg + SmartRemoteGigs', version: '3.7' }));
+app.get('/health', (_, res) => res.json({ status: 'ok', version: '4.0' }));
+app.get('/', (_, res) => res.json({ service: 'SmartRemoteGigs Video', version: '4.0' }));
 
 app.listen(PORT, () => {
   console.log(`🎬 SmartRemoteGigs Video Server → http://localhost:${PORT}`);
