@@ -34,7 +34,7 @@ const BG_MUSIC_FILES = [
   path.join(ASSETS_DIR, 'bg-music-3.mp3'),
 ];
 
-// ✅ Venv Python path (installed during Docker build)
+// ✅ Venv Python path (explicitly set)
 const VENV_PYTHON = '/opt/venv/bin/python3';
 
 // ── Verify Kokoro at startup ──────────────────────────────────────────────
@@ -104,6 +104,7 @@ async function generateKokoroSpeech(text, voiceId, outputPath) {
   const scriptPath = path.join(__dirname, 'kokoro_tts.py');
 
   return new Promise((resolve, reject) => {
+    // ✅ Use VENV_PYTHON explicitly
     const python = spawn(VENV_PYTHON, [scriptPath], {
       env: {
         ...process.env,
@@ -322,8 +323,8 @@ app.post('/render', async (req, res) => {
   }
 });
 
-app.get('/health', (_, res) => res.json({ status: 'ok', version: '6.6' }));
-app.get('/', (_, res) => res.json({ service: 'SmartRemoteGigs Video + Kokoro TTS', version: '6.6' }));
+app.get('/health', (_, res) => res.json({ status: 'ok', version: '6.7' }));
+app.get('/', (_, res) => res.json({ service: 'SmartRemoteGigs Video + Kokoro TTS', version: '6.7' }));
 
 // ── Start server ────────────────────────────────────────────────────────────
 app.listen(PORT, async () => {
