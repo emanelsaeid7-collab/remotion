@@ -43,7 +43,6 @@ async function ensureKokoroInstalled() {
   } catch (e) {
     console.log('[startup] 🔄 Kokoro TTS not found, installing...');
     try {
-      // Try with --break-system-packages first (Debian 12+)
       await execAsync('python3 -m pip install --break-system-packages kokoro-onnx soundfile 2>/dev/null || pip install kokoro-onnx soundfile');
       console.log('[startup] ✅ Kokoro TTS installed successfully');
       return true;
@@ -102,24 +101,49 @@ async function getAudioDuration(filePath) {
 }
 
 // ── Helper: Generate speech with Kokoro TTS ────────────────────────────────
+// ✅ FIXED: Write text to temp file instead of embedding in Python string
 async function generateKokoroSpeech(text, voiceId, outputPath) {
+  const tempTextFile = path.join(OUTPUT_DIR, `kokoro_text_${Date.now()}.txt`);
+
+  // Write text to temp file (avoids string escaping issues)
+  fs.writeFileSync(tempTextFile, text, 'utf-8');
+
   return new Promise((resolve, reject) => {
     const pythonScript = `
-import sys, soundfile as sf
+import sys, os, soundfile as sf
+
 try:
     from kokoro import KPipeline
+
+    text_file = os.environ.get('KOKORO_TEXT_FILE')
+    voice = os.environ.get('KOKORO_VOICE', 'af_heart')
+    output = os.environ.get('KOKORO_OUTPUT')
+
+    with open(text_file, 'r', encoding='utf-8') as f:
+        text = f.read()
+
     pipeline = KPipeline(lang_code='a')
-    generator = pipeline(""" + JSON.stringify(text) + """, voice='""" + voiceId + """', speed=1.0, split_pattern=r'\n+')
+    generator = pipeline(text, voice=voice, speed=1.0, split_pattern=r'\n+')
+
     for i, (gs, ps, audio) in enumerate(generator):
-        sf.write(""" + outputPath + """, audio, 24000)
+        sf.write(output, audio, 24000)
         break
+
     print("KOKORO_SUCCESS")
 except Exception as e:
     print(f"KOKORO_ERROR: {e}", file=sys.stderr)
     sys.exit(1)
 `;
 
-    const python = spawn('python3', ['-c', pythonScript]);
+    const python = spawn('python3', ['-c', pythonScript], {
+      env: {
+        ...process.env,
+        KOKORO_TEXT_FILE: tempTextFile,
+        KOKORO_VOICE: voiceId,
+        KOKORO_OUTPUT: outputPath,
+      }
+    });
+
     let stdout = '';
     let stderr = '';
 
@@ -127,6 +151,9 @@ except Exception as e:
     python.stderr.on('data', (data) => { stderr += data.toString(); console.log('[kokoro]', data.toString().trim()); });
 
     python.on('close', (code) => {
+      // Cleanup temp text file
+      try { if (fs.existsSync(tempTextFile)) fs.unlinkSync(tempTextFile); } catch {}
+
       if (code === 0 && stdout.includes('KOKORO_SUCCESS')) {
         resolve();
       } else {
@@ -184,6 +211,7 @@ app.post('/render', async (req, res) => {
   console.log('=== KOKORO TTS ===');
   console.log('Voice:', selectedVoice);
   console.log('Text length:', narrationText.length);
+  console.log('Text preview:', narrationText.substring(0, 100));
 
   try {
     await generateKokoroSpeech(narrationText, selectedVoice, voiceFile);
@@ -326,13 +354,11 @@ app.post('/render', async (req, res) => {
   }
 });
 
-app.get('/health', (_, res) => res.json({ status: 'ok', version: '6.1' }));
-app.get('/', (_, res) => res.json({ service: 'SmartRemoteGigs Video + Kokoro TTS', version: '6.1' }));
+app.get('/health', (_, res) => res.json({ status: 'ok', version: '6.2' }));
+app.get('/', (_, res) => res.json({ service: 'SmartRemoteGigs Video + Kokoro TTS', version: '6.2' }));
 
 // ── Start server ────────────────────────────────────────────────────────────
 app.listen(PORT, async () => {
   console.log(`🎬 SmartRemoteGigs Video Server → http://localhost:${PORT}`);
-
-  // Auto-install Kokoro on startup
   await ensureKokoroInstalled();
 });
