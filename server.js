@@ -95,17 +95,41 @@ app.post('/render', async (req, res) => {
 
   const logoBase64 = await getLogoBase64();
 
-  // ── 1. Save audio ─────────────────────────────────────────────────────────
+  // ── 1. Extract audio base64 from ALL possible sources ────────────────────
+  let audioBase64 = '';
+
+  // Source 1: audio.base64 (nested object)
+  if (audio?.base64 && audio.base64.length > 100) {
+    audioBase64 = audio.base64;
+    console.log('[audio] ✅ Source 1: audio.base64');
+  }
+  // Source 2: audio_base64 (flat property)
+  else if (videoData?.audio_base64 && videoData.audio_base64.length > 100) {
+    audioBase64 = videoData.audio_base64;
+    console.log('[audio] ✅ Source 2: audio_base64');
+  }
+  // Source 3: data (from Move Binary Data node)
+  else if (videoData?.data && videoData.data.length > 100) {
+    audioBase64 = videoData.data;
+    console.log('[audio] ✅ Source 3: data');
+  }
+  // Source 4: audio as string directly
+  else if (typeof audio === 'string' && audio.length > 100) {
+    audioBase64 = audio;
+    console.log('[audio] ✅ Source 4: audio string');
+  }
+
+  console.log('=== AUDIO CHECK ===');
+  console.log('audioBase64 length:', audioBase64.length);
+  console.log('audioBase64 first 50:', audioBase64.substring(0, 50));
+
+  // ── 2. Save audio ────────────────────────────────────────────────────────
   let hasAudio = false;
   let audioDurationSec = 0;
 
-  console.log('=== AUDIO CHECK ===');
-  console.log('audio?.base64 exists:', !!(audio && audio.base64));
-  console.log('audio?.base64 length:', audio?.base64?.length || 0);
-
-  if (audio?.base64 && audio.base64.length > 100) {
+  if (audioBase64 && audioBase64.length > 100) {
     try {
-      const audioBuffer = Buffer.from(audio.base64, 'base64');
+      const audioBuffer = Buffer.from(audioBase64, 'base64');
       console.log('audioBuffer size:', audioBuffer.length, 'bytes');
 
       fs.writeFileSync(audioFile, audioBuffer);
@@ -120,10 +144,10 @@ app.post('/render', async (req, res) => {
       hasAudio = false;
     }
   } else {
-    console.log(`[audio] ⚠️  No valid audio (length: ${audio?.base64?.length || 0})`);
+    console.log(`[audio] ⚠️  No valid audio (length: ${audioBase64.length})`);
   }
 
-  // ── 2. Adjust sceneTimings ────────────────────────────────────────────────
+  // ── 3. Adjust sceneTimings ────────────────────────────────────────────────
   let adjustedTimings = sceneTimings || [];
   let audioSec = 30;
 
@@ -148,10 +172,12 @@ app.post('/render', async (req, res) => {
   const totalFrames = Math.ceil(audioSec * FPS);
   console.log(`[render] audio=${audioSec}s | frames=${totalFrames}`);
 
-  // ── 3. Build props ────────────────────────────────────────────────────────
+  // ── 4. Build props ────────────────────────────────────────────────────────
   const finalVideoData = { ...videoData };
   delete finalVideoData.audio;
   delete finalVideoData.audioUrl;
+  delete finalVideoData.audio_base64;
+  delete finalVideoData.data;
 
   finalVideoData.sceneTimings = adjustedTimings;
   finalVideoData.audioDuration = audioDurationSec;
@@ -166,7 +192,7 @@ app.post('/render', async (req, res) => {
   const entryPoint = path.join(__dirname, 'src', 'Root.jsx');
 
   try {
-    // ── 4. Render silent video ────────────────────────────────────────────
+    // ── 5. Render silent video ────────────────────────────────────────────
     const renderCmd = [
       'npx remotion render',
       `"${entryPoint}"`,
@@ -182,7 +208,7 @@ app.post('/render', async (req, res) => {
     fs.unlinkSync(propsFile);
     console.log(`[render] ✅ Silent video done`);
 
-    // ── 5. Merge with FFmpeg ──────────────────────────────────────────────
+    // ── 6. Merge with FFmpeg ──────────────────────────────────────────────
     if (hasAudio) {
       console.log(`[ffmpeg] ▶ Merging audio + video...`);
       const ffmpegCmd = [
@@ -228,8 +254,8 @@ app.post('/render', async (req, res) => {
   }
 });
 
-app.get('/health', (_, res) => res.json({ status: 'ok', version: '4.0' }));
-app.get('/', (_, res) => res.json({ service: 'SmartRemoteGigs Video', version: '4.0' }));
+app.get('/health', (_, res) => res.json({ status: 'ok', version: '4.1' }));
+app.get('/', (_, res) => res.json({ service: 'SmartRemoteGigs Video', version: '4.1' }));
 
 app.listen(PORT, () => {
   console.log(`🎬 SmartRemoteGigs Video Server → http://localhost:${PORT}`);
