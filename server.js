@@ -5,6 +5,8 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import https from 'https';
+import http from 'http';
+import { spawn } from 'child_process';
 
 const execAsync = promisify(exec);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -12,7 +14,9 @@ const app = express();
 app.use(express.json({ limit: '50mb' }));
 
 const OUTPUT_DIR = path.join(__dirname, 'output');
+const ASSETS_DIR = path.join(__dirname, 'assets');
 fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+fs.mkdirSync(ASSETS_DIR, { recursive: true });
 app.use('/videos', express.static(OUTPUT_DIR));
 
 const VIDEO_TYPE_MAP = {
@@ -24,10 +28,19 @@ const VIDEO_TYPE_MAP = {
 const FPS = 30;
 const PORT = process.env.PORT || 3030;
 
+// ── Background music files ────────────────────────────────────────────────
+const BG_MUSIC_FILES = [
+  path.join(ASSETS_DIR, 'bg-music-1.mp3'),
+  path.join(ASSETS_DIR, 'bg-music-2.mp3'),
+  path.join(ASSETS_DIR, 'bg-music-3.mp3'),
+];
+
+// ── Helper: Download file ──────────────────────────────────────────────────
 async function downloadFile(url, destPath) {
   return new Promise((resolve, reject) => {
+    const protocol = url.startsWith('https:') ? https : http;
     const file = fs.createWriteStream(destPath);
-    https.get(url, (response) => {
+    protocol.get(url, (response) => {
       if (response.statusCode !== 200) {
         reject(new Error(`Download failed: ${response.statusCode}`));
         return;
@@ -38,17 +51,14 @@ async function downloadFile(url, destPath) {
   });
 }
 
+// ── Helper: Ensure logo ────────────────────────────────────────────────────
 async function ensureLogo() {
-  const logoDir = path.join(__dirname, 'assets');
-  const logoPath = path.join(logoDir, 'logo.webp');
-  fs.mkdirSync(logoDir, { recursive: true });
+  const logoPath = path.join(ASSETS_DIR, 'logo.webp');
   if (!fs.existsSync(logoPath)) {
-    console.log('[assets] 🖼️  Downloading logo...');
     try {
       await downloadFile('https://smartremotegigs.com/wp-content/uploads/2026/06/Favicon3.webp', logoPath);
-      console.log('[assets] ✅ Logo downloaded');
     } catch (e) {
-      console.error('[assets] ❌', e.message);
+      console.error('[assets] Logo download failed:', e.message);
       return null;
     }
   }
@@ -61,93 +71,142 @@ async function getLogoBase64() {
   try {
     const buffer = fs.readFileSync(logoPath);
     return `data:image/webp;base64,${buffer.toString('base64')}`;
-  } catch (e) {
-    console.error('[assets] ❌', e.message);
-    return null;
-  }
+  } catch (e) { return null; }
 }
 
+// ── Helper: Audio duration ──────────────────────────────────────────────────
 async function getAudioDuration(filePath) {
   try {
     const { stdout } = await execAsync(
       `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`
     );
-    const duration = parseFloat(stdout.trim());
-    return isNaN(duration) ? 0 : duration;
-  } catch (e) {
-    console.error(`[ffprobe] ❌`, e.message);
-    return 0;
-  }
+    const d = parseFloat(stdout.trim());
+    return isNaN(d) ? 0 : d;
+  } catch (e) { return 0; }
+}
+
+// ── Helper: Generate speech with Kokoro TTS ────────────────────────────────
+async function generateKokoroSpeech(text, voiceId, outputPath) {
+  return new Promise((resolve, reject) => {
+    const pythonScript = `
+import sys
+import soundfile as sf
+try:
+    from kokoro import KPipeline
+    pipeline = KPipeline(lang_code='a')
+    generator = pipeline(""" + JSON.stringify(text) + """, voice='""" + voiceId + """', speed=1.0, split_pattern=r'\n+')
+    for i, (gs, ps, audio) in enumerate(generator):
+        sf.write('""" + outputPath + """', audio, 24000)
+        break
+    print("KOKORO_SUCCESS")
+except Exception as e:
+    print(f"KOKORO_ERROR: {e}", file=sys.stderr)
+    sys.exit(1)
+`;
+
+    const python = spawn('python3', ['-c', pythonScript]);
+    let stdout = '';
+    let stderr = '';
+
+    python.stdout.on('data', (data) => { stdout += data.toString(); });
+    python.stderr.on('data', (data) => { stderr += data.toString(); console.log('[kokoro]', data.toString().trim()); });
+
+    python.on('close', (code) => {
+      if (code === 0 && stdout.includes('KOKORO_SUCCESS')) {
+        resolve();
+      } else {
+        reject(new Error(`Kokoro failed (code ${code}): ${stderr || stdout}`));
+      }
+    });
+  });
+}
+
+// ── Helper: Merge voice + background music ─────────────────────────────────
+async function mergeWithBackgroundMusic(voicePath, musicPath, outputPath, targetDuration) {
+  // Mix voice (loud) + music (quiet, -20dB)
+  const ffmpegCmd = [
+    'ffmpeg -y',
+    `-i "${voicePath}"`,
+    `-i "${musicPath}"`,
+    `-filter_complex "`,
+    `[1:a]afade=t=out:st=${Math.max(targetDuration - 3, 0)}:d=3,volume=0.08[music];`,
+    `[0:a][music]amix=inputs=2:duration=first:dropout_transition=3[a]"`,
+    `-map "[a]"`,
+    `-c:a aac -b:a 192k`,
+    `"${outputPath}"`,
+  ].join(' ');
+
+  await execAsync(ffmpegCmd, { timeout: 60 * 1000 });
+}
+
+// ── Helper: Get random background music ───────────────────────────────────
+function getRandomBackgroundMusic() {
+  const available = BG_MUSIC_FILES.filter(f => fs.existsSync(f));
+  if (available.length === 0) return null;
+  return available[Math.floor(Math.random() * available.length)];
 }
 
 app.post('/render', async (req, res) => {
   const videoData = req.body;
-  const { videoType, sceneTimings, audio, voice_id } = videoData;
+  const { videoType, sceneTimings, voice_id, fullNarration, music } = videoData;
 
   const compositionId = VIDEO_TYPE_MAP[videoType] || 'FixVideo';
-  const timestamp     = Date.now();
-  const baseUrl       = process.env.BASE_URL || `http://localhost:${PORT}`;
+  const timestamp = Date.now();
+  const baseUrl = process.env.BASE_URL || `http://localhost:${PORT}`;
 
   const silentVideo = path.join(OUTPUT_DIR, `silent_${timestamp}.mp4`);
-  const audioFile   = path.join(OUTPUT_DIR, `audio_${timestamp}.mp3`);
-  const finalVideo  = path.join(OUTPUT_DIR, `${videoType}_${timestamp}.mp4`);
-  const propsFile   = path.join(OUTPUT_DIR, `props_${timestamp}.json`);
+  const voiceFile = path.join(OUTPUT_DIR, `voice_${timestamp}.wav`);
+  const finalAudio = path.join(OUTPUT_DIR, `audio_${timestamp}.mp3`);
+  const finalVideo = path.join(OUTPUT_DIR, `${videoType}_${timestamp}.mp4`);
+  const propsFile = path.join(OUTPUT_DIR, `props_${timestamp}.json`);
 
   const logoBase64 = await getLogoBase64();
 
-  // ── 1. Extract audio base64 from ALL possible sources ────────────────────
-  let audioBase64 = '';
-
-  // Source 1: audio.base64 (nested object)
-  if (audio?.base64 && audio.base64.length > 100) {
-    audioBase64 = audio.base64;
-    console.log('[audio] ✅ Source 1: audio.base64');
-  }
-  // Source 2: audio_base64 (flat property)
-  else if (videoData?.audio_base64 && videoData.audio_base64.length > 100) {
-    audioBase64 = videoData.audio_base64;
-    console.log('[audio] ✅ Source 2: audio_base64');
-  }
-  // Source 3: data (from Move Binary Data node)
-  else if (videoData?.data && videoData.data.length > 100) {
-    audioBase64 = videoData.data;
-    console.log('[audio] ✅ Source 3: data');
-  }
-  // Source 4: audio as string directly
-  else if (typeof audio === 'string' && audio.length > 100) {
-    audioBase64 = audio;
-    console.log('[audio] ✅ Source 4: audio string');
-  }
-
-  console.log('=== AUDIO CHECK ===');
-  console.log('audioBase64 length:', audioBase64.length);
-  console.log('audioBase64 first 50:', audioBase64.substring(0, 50));
-
-  // ── 2. Save audio ────────────────────────────────────────────────────────
+  // ── 1. Generate voice with Kokoro TTS ────────────────────────────────────
   let hasAudio = false;
   let audioDurationSec = 0;
+  const selectedVoice = voice_id || 'af_heart';
+  const narrationText = fullNarration || videoData.title || 'Hello';
 
-  if (audioBase64 && audioBase64.length > 100) {
-    try {
-      const audioBuffer = Buffer.from(audioBase64, 'base64');
-      console.log('audioBuffer size:', audioBuffer.length, 'bytes');
+  console.log('=== KOKORO TTS ===');
+  console.log('Voice:', selectedVoice);
+  console.log('Text length:', narrationText.length);
 
-      fs.writeFileSync(audioFile, audioBuffer);
-      const stats = fs.statSync(audioFile);
-      hasAudio = true;
-      console.log(`[audio] ✅ Saved MP3 — ${stats.size} bytes`);
+  try {
+    await generateKokoroSpeech(narrationText, selectedVoice, voiceFile);
+    const voiceStats = fs.statSync(voiceFile);
+    console.log(`[kokoro] ✅ Generated — ${voiceStats.size} bytes`);
 
-      audioDurationSec = await getAudioDuration(audioFile);
-      console.log(`[audio] ⏱️  Duration: ${audioDurationSec}s`);
-    } catch (e) {
-      console.error(`[audio] ❌ Error:`, e.message);
-      hasAudio = false;
-    }
-  } else {
-    console.log(`[audio] ⚠️  No valid audio (length: ${audioBase64.length})`);
+    audioDurationSec = await getAudioDuration(voiceFile);
+    console.log(`[kokoro] ⏱️  Duration: ${audioDurationSec}s`);
+    hasAudio = true;
+  } catch (e) {
+    console.error(`[kokoro] ❌ TTS failed:`, e.message);
+    hasAudio = false;
   }
 
-  // ── 3. Adjust sceneTimings ────────────────────────────────────────────────
+  // ── 2. Add background music (optional) ───────────────────────────────────
+  if (hasAudio && (music !== false)) {
+    const bgMusic = getRandomBackgroundMusic();
+    if (bgMusic) {
+      console.log(`[music] 🎵 Adding background: ${path.basename(bgMusic)}`);
+      try {
+        await mergeWithBackgroundMusic(voiceFile, bgMusic, finalAudio, audioDurationSec);
+        fs.unlinkSync(voiceFile);
+        console.log(`[music] ✅ Mixed with background music`);
+      } catch (e) {
+        console.error(`[music] ❌ Mix failed, using voice only:`, e.message);
+        fs.renameSync(voiceFile, finalAudio);
+      }
+    } else {
+      console.log(`[music] ⚠️  No background music found, using voice only`);
+      fs.renameSync(voiceFile, finalAudio);
+    }
+  } else if (hasAudio) {
+    fs.renameSync(voiceFile, finalAudio);
+  }
+
+  // ── 3. Adjust sceneTimings ───────────────────────────────────────────────
   let adjustedTimings = sceneTimings || [];
   let audioSec = 30;
 
@@ -172,19 +231,18 @@ app.post('/render', async (req, res) => {
   const totalFrames = Math.ceil(audioSec * FPS);
   console.log(`[render] audio=${audioSec}s | frames=${totalFrames}`);
 
-  // ── 4. Build props ────────────────────────────────────────────────────────
+  // ── 4. Build props ──────────────────────────────────────────────────────
   const finalVideoData = { ...videoData };
   delete finalVideoData.audio;
   delete finalVideoData.audioUrl;
-  delete finalVideoData.audio_base64;
-  delete finalVideoData.data;
+  delete finalVideoData.fullNarration;
 
   finalVideoData.sceneTimings = adjustedTimings;
   finalVideoData.audioDuration = audioDurationSec;
   finalVideoData.totalDurationFrames = totalFrames;
   finalVideoData.ctaDurFrames = Math.ceil(5 * FPS);
   finalVideoData.logoBase64 = logoBase64;
-  finalVideoData.voiceId = voice_id || 'cgSgspJ2msm6clMCkdW9';
+  finalVideoData.voiceId = selectedVoice;
 
   fs.writeFileSync(propsFile, JSON.stringify({ videoData: finalVideoData }, null, 2));
 
@@ -192,7 +250,7 @@ app.post('/render', async (req, res) => {
   const entryPoint = path.join(__dirname, 'src', 'Root.jsx');
 
   try {
-    // ── 5. Render silent video ────────────────────────────────────────────
+    // ── 5. Render silent video ───────────────────────────────────────────
     const renderCmd = [
       'npx remotion render',
       `"${entryPoint}"`,
@@ -208,13 +266,13 @@ app.post('/render', async (req, res) => {
     fs.unlinkSync(propsFile);
     console.log(`[render] ✅ Silent video done`);
 
-    // ── 6. Merge with FFmpeg ──────────────────────────────────────────────
+    // ── 6. Merge with FFmpeg ─────────────────────────────────────────────
     if (hasAudio) {
-      console.log(`[ffmpeg] ▶ Merging audio + video...`);
+      console.log(`[ffmpeg] ▶ Merging...`);
       const ffmpegCmd = [
         'ffmpeg -y',
         `-i "${silentVideo}"`,
-        `-i "${audioFile}"`,
+        `-i "${finalAudio}"`,
         `-c:v copy`,
         `-c:a aac`,
         `-b:a 192k`,
@@ -226,10 +284,9 @@ app.post('/render', async (req, res) => {
 
       await execAsync(ffmpegCmd, { timeout: 5 * 60 * 1000 });
       fs.unlinkSync(silentVideo);
-      fs.unlinkSync(audioFile);
+      fs.unlinkSync(finalAudio);
       console.log(`[ffmpeg] ✅ Merge done`);
     } else {
-      console.log(`[render] ⚠️  No audio — video only`);
       fs.renameSync(silentVideo, finalVideo);
     }
 
@@ -243,19 +300,20 @@ app.post('/render', async (req, res) => {
       durationSec: audioSec,
       audioDuration: audioDurationSec,
       hasAudio,
+      voice: selectedVoice,
     });
 
   } catch (err) {
     console.error(`[error] ❌`, err.message);
-    [propsFile, silentVideo, audioFile].forEach(f => {
+    [propsFile, silentVideo, voiceFile, finalAudio].forEach(f => {
       try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch {}
     });
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get('/health', (_, res) => res.json({ status: 'ok', version: '4.1' }));
-app.get('/', (_, res) => res.json({ service: 'SmartRemoteGigs Video', version: '4.1' }));
+app.get('/health', (_, res) => res.json({ status: 'ok', version: '6.0' }));
+app.get('/', (_, res) => res.json({ service: 'SmartRemoteGigs Video + Kokoro TTS', version: '6.0' }));
 
 app.listen(PORT, () => {
   console.log(`🎬 SmartRemoteGigs Video Server → http://localhost:${PORT}`);
