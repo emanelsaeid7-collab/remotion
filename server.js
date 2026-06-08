@@ -34,6 +34,27 @@ const BG_MUSIC_FILES = [
   path.join(ASSETS_DIR, 'bg-music-3.mp3'),
 ];
 
+// ── Auto-install Kokoro TTS if missing ──────────────────────────────────────
+async function ensureKokoroInstalled() {
+  try {
+    await execAsync('python3 -c "from kokoro import KPipeline"');
+    console.log('[startup] ✅ Kokoro TTS is installed');
+    return true;
+  } catch (e) {
+    console.log('[startup] 🔄 Kokoro TTS not found, installing...');
+    try {
+      // Try with --break-system-packages first (Debian 12+)
+      await execAsync('python3 -m pip install --break-system-packages kokoro-onnx soundfile 2>/dev/null || pip install kokoro-onnx soundfile');
+      console.log('[startup] ✅ Kokoro TTS installed successfully');
+      return true;
+    } catch (installError) {
+      console.error('[startup] ❌ Failed to install Kokoro:', installError.message);
+      return false;
+    }
+  }
+}
+
+// ── Helper: Download file ──────────────────────────────────────────────────
 async function downloadFile(url, destPath) {
   return new Promise((resolve, reject) => {
     const protocol = url.startsWith('https:') ? https : http;
@@ -49,6 +70,7 @@ async function downloadFile(url, destPath) {
   });
 }
 
+// ── Helper: Ensure logo ────────────────────────────────────────────────────
 async function ensureLogo() {
   const logoPath = path.join(ASSETS_DIR, 'logo.webp');
   if (!fs.existsSync(logoPath)) {
@@ -68,6 +90,7 @@ async function getLogoBase64() {
   } catch (e) { return null; }
 }
 
+// ── Helper: Audio duration ──────────────────────────────────────────────────
 async function getAudioDuration(filePath) {
   try {
     const { stdout } = await execAsync(
@@ -78,6 +101,7 @@ async function getAudioDuration(filePath) {
   } catch (e) { return 0; }
 }
 
+// ── Helper: Generate speech with Kokoro TTS ────────────────────────────────
 async function generateKokoroSpeech(text, voiceId, outputPath) {
   return new Promise((resolve, reject) => {
     const pythonScript = `
@@ -85,7 +109,7 @@ import sys, soundfile as sf
 try:
     from kokoro import KPipeline
     pipeline = KPipeline(lang_code='a')
-    generator = pipeline(""" + JSON.stringify(text) + """, voice='""" + voiceId + """', speed=1.0, split_pattern=r'\\n+')
+    generator = pipeline(""" + JSON.stringify(text) + """, voice='""" + voiceId + """', speed=1.0, split_pattern=r'\n+')
     for i, (gs, ps, audio) in enumerate(generator):
         sf.write(""" + outputPath + """, audio, 24000)
         break
@@ -98,10 +122,10 @@ except Exception as e:
     const python = spawn('python3', ['-c', pythonScript]);
     let stdout = '';
     let stderr = '';
-    
+
     python.stdout.on('data', (data) => { stdout += data.toString(); });
     python.stderr.on('data', (data) => { stderr += data.toString(); console.log('[kokoro]', data.toString().trim()); });
-    
+
     python.on('close', (code) => {
       if (code === 0 && stdout.includes('KOKORO_SUCCESS')) {
         resolve();
@@ -112,6 +136,7 @@ except Exception as e:
   });
 }
 
+// ── Helper: Merge voice + background music ─────────────────────────────────
 async function mergeWithBackgroundMusic(voicePath, musicPath, outputPath, targetDuration) {
   const ffmpegCmd = [
     'ffmpeg -y',
@@ -164,7 +189,7 @@ app.post('/render', async (req, res) => {
     await generateKokoroSpeech(narrationText, selectedVoice, voiceFile);
     const voiceStats = fs.statSync(voiceFile);
     console.log(`[kokoro] ✅ Generated — ${voiceStats.size} bytes`);
-    
+
     audioDurationSec = await getAudioDuration(voiceFile);
     console.log(`[kokoro] ⏱️  Duration: ${audioDurationSec}s`);
     hasAudio = true;
@@ -224,7 +249,7 @@ app.post('/render', async (req, res) => {
   delete finalVideoData.audio;
   delete finalVideoData.audioUrl;
   delete finalVideoData.fullNarration;
-  
+
   finalVideoData.sceneTimings = adjustedTimings;
   finalVideoData.audioDuration = audioDurationSec;
   finalVideoData.totalDurationFrames = totalFrames;
@@ -301,9 +326,13 @@ app.post('/render', async (req, res) => {
   }
 });
 
-app.get('/health', (_, res) => res.json({ status: 'ok', version: '6.0' }));
-app.get('/', (_, res) => res.json({ service: 'SmartRemoteGigs Video + Kokoro TTS', version: '6.0' }));
+app.get('/health', (_, res) => res.json({ status: 'ok', version: '6.1' }));
+app.get('/', (_, res) => res.json({ service: 'SmartRemoteGigs Video + Kokoro TTS', version: '6.1' }));
 
-app.listen(PORT, () => {
+// ── Start server ────────────────────────────────────────────────────────────
+app.listen(PORT, async () => {
   console.log(`🎬 SmartRemoteGigs Video Server → http://localhost:${PORT}`);
+
+  // Auto-install Kokoro on startup
+  await ensureKokoroInstalled();
 });
