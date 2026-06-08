@@ -28,14 +28,12 @@ const VIDEO_TYPE_MAP = {
 const FPS = 30;
 const PORT = process.env.PORT || 3030;
 
-// ── Background music files ────────────────────────────────────────────────
 const BG_MUSIC_FILES = [
   path.join(ASSETS_DIR, 'bg-music-1.mp3'),
   path.join(ASSETS_DIR, 'bg-music-2.mp3'),
   path.join(ASSETS_DIR, 'bg-music-3.mp3'),
 ];
 
-// ── Helper: Download file ──────────────────────────────────────────────────
 async function downloadFile(url, destPath) {
   return new Promise((resolve, reject) => {
     const protocol = url.startsWith('https:') ? https : http;
@@ -51,16 +49,12 @@ async function downloadFile(url, destPath) {
   });
 }
 
-// ── Helper: Ensure logo ────────────────────────────────────────────────────
 async function ensureLogo() {
   const logoPath = path.join(ASSETS_DIR, 'logo.webp');
   if (!fs.existsSync(logoPath)) {
     try {
       await downloadFile('https://smartremotegigs.com/wp-content/uploads/2026/06/Favicon3.webp', logoPath);
-    } catch (e) {
-      console.error('[assets] Logo download failed:', e.message);
-      return null;
-    }
+    } catch (e) { return null; }
   }
   return logoPath;
 }
@@ -74,7 +68,6 @@ async function getLogoBase64() {
   } catch (e) { return null; }
 }
 
-// ── Helper: Audio duration ──────────────────────────────────────────────────
 async function getAudioDuration(filePath) {
   try {
     const { stdout } = await execAsync(
@@ -85,18 +78,16 @@ async function getAudioDuration(filePath) {
   } catch (e) { return 0; }
 }
 
-// ── Helper: Generate speech with Kokoro TTS ────────────────────────────────
 async function generateKokoroSpeech(text, voiceId, outputPath) {
   return new Promise((resolve, reject) => {
     const pythonScript = `
-import sys
-import soundfile as sf
+import sys, soundfile as sf
 try:
     from kokoro import KPipeline
     pipeline = KPipeline(lang_code='a')
-    generator = pipeline(""" + JSON.stringify(text) + """, voice='""" + voiceId + """', speed=1.0, split_pattern=r'\n+')
+    generator = pipeline(""" + JSON.stringify(text) + """, voice='""" + voiceId + """', speed=1.0, split_pattern=r'\\n+')
     for i, (gs, ps, audio) in enumerate(generator):
-        sf.write('""" + outputPath + """', audio, 24000)
+        sf.write(""" + outputPath + """, audio, 24000)
         break
     print("KOKORO_SUCCESS")
 except Exception as e:
@@ -107,10 +98,10 @@ except Exception as e:
     const python = spawn('python3', ['-c', pythonScript]);
     let stdout = '';
     let stderr = '';
-
+    
     python.stdout.on('data', (data) => { stdout += data.toString(); });
     python.stderr.on('data', (data) => { stderr += data.toString(); console.log('[kokoro]', data.toString().trim()); });
-
+    
     python.on('close', (code) => {
       if (code === 0 && stdout.includes('KOKORO_SUCCESS')) {
         resolve();
@@ -121,9 +112,7 @@ except Exception as e:
   });
 }
 
-// ── Helper: Merge voice + background music ─────────────────────────────────
 async function mergeWithBackgroundMusic(voicePath, musicPath, outputPath, targetDuration) {
-  // Mix voice (loud) + music (quiet, -20dB)
   const ffmpegCmd = [
     'ffmpeg -y',
     `-i "${voicePath}"`,
@@ -139,7 +128,6 @@ async function mergeWithBackgroundMusic(voicePath, musicPath, outputPath, target
   await execAsync(ffmpegCmd, { timeout: 60 * 1000 });
 }
 
-// ── Helper: Get random background music ───────────────────────────────────
 function getRandomBackgroundMusic() {
   const available = BG_MUSIC_FILES.filter(f => fs.existsSync(f));
   if (available.length === 0) return null;
@@ -162,7 +150,7 @@ app.post('/render', async (req, res) => {
 
   const logoBase64 = await getLogoBase64();
 
-  // ── 1. Generate voice with Kokoro TTS ────────────────────────────────────
+  // ── 1. Generate voice with Kokoro TTS ──────────────────────────────────
   let hasAudio = false;
   let audioDurationSec = 0;
   const selectedVoice = voice_id || 'af_heart';
@@ -176,7 +164,7 @@ app.post('/render', async (req, res) => {
     await generateKokoroSpeech(narrationText, selectedVoice, voiceFile);
     const voiceStats = fs.statSync(voiceFile);
     console.log(`[kokoro] ✅ Generated — ${voiceStats.size} bytes`);
-
+    
     audioDurationSec = await getAudioDuration(voiceFile);
     console.log(`[kokoro] ⏱️  Duration: ${audioDurationSec}s`);
     hasAudio = true;
@@ -185,7 +173,7 @@ app.post('/render', async (req, res) => {
     hasAudio = false;
   }
 
-  // ── 2. Add background music (optional) ───────────────────────────────────
+  // ── 2. Add background music ────────────────────────────────────────────
   if (hasAudio && (music !== false)) {
     const bgMusic = getRandomBackgroundMusic();
     if (bgMusic) {
@@ -199,14 +187,14 @@ app.post('/render', async (req, res) => {
         fs.renameSync(voiceFile, finalAudio);
       }
     } else {
-      console.log(`[music] ⚠️  No background music found, using voice only`);
+      console.log(`[music] ⚠️  No background music found`);
       fs.renameSync(voiceFile, finalAudio);
     }
   } else if (hasAudio) {
     fs.renameSync(voiceFile, finalAudio);
   }
 
-  // ── 3. Adjust sceneTimings ───────────────────────────────────────────────
+  // ── 3. Adjust sceneTimings ─────────────────────────────────────────────
   let adjustedTimings = sceneTimings || [];
   let audioSec = 30;
 
@@ -231,12 +219,12 @@ app.post('/render', async (req, res) => {
   const totalFrames = Math.ceil(audioSec * FPS);
   console.log(`[render] audio=${audioSec}s | frames=${totalFrames}`);
 
-  // ── 4. Build props ──────────────────────────────────────────────────────
+  // ── 4. Build props ─────────────────────────────────────────────────────
   const finalVideoData = { ...videoData };
   delete finalVideoData.audio;
   delete finalVideoData.audioUrl;
   delete finalVideoData.fullNarration;
-
+  
   finalVideoData.sceneTimings = adjustedTimings;
   finalVideoData.audioDuration = audioDurationSec;
   finalVideoData.totalDurationFrames = totalFrames;
@@ -250,7 +238,7 @@ app.post('/render', async (req, res) => {
   const entryPoint = path.join(__dirname, 'src', 'Root.jsx');
 
   try {
-    // ── 5. Render silent video ───────────────────────────────────────────
+    // ── 5. Render silent video ─────────────────────────────────────────
     const renderCmd = [
       'npx remotion render',
       `"${entryPoint}"`,
@@ -266,7 +254,7 @@ app.post('/render', async (req, res) => {
     fs.unlinkSync(propsFile);
     console.log(`[render] ✅ Silent video done`);
 
-    // ── 6. Merge with FFmpeg ─────────────────────────────────────────────
+    // ── 6. Merge with FFmpeg ───────────────────────────────────────────
     if (hasAudio) {
       console.log(`[ffmpeg] ▶ Merging...`);
       const ffmpegCmd = [
@@ -287,6 +275,7 @@ app.post('/render', async (req, res) => {
       fs.unlinkSync(finalAudio);
       console.log(`[ffmpeg] ✅ Merge done`);
     } else {
+      console.log(`[render] ⚠️  No audio — video only`);
       fs.renameSync(silentVideo, finalVideo);
     }
 
