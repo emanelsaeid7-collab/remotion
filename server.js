@@ -101,41 +101,40 @@ async function getAudioDuration(filePath) {
 }
 
 // ── Helper: Generate speech with Kokoro TTS ────────────────────────────────
-// ✅ FIXED: Write text to temp file instead of embedding in Python string
+// ✅ FIXED: Write Python script to temp file instead of -c
 async function generateKokoroSpeech(text, voiceId, outputPath) {
   const tempTextFile = path.join(OUTPUT_DIR, `kokoro_text_${Date.now()}.txt`);
+  const tempScriptFile = path.join(OUTPUT_DIR, `kokoro_script_${Date.now()}.py`);
 
-  // Write text to temp file (avoids string escaping issues)
+  // Write text to temp file
   fs.writeFileSync(tempTextFile, text, 'utf-8');
 
+  // Write Python script to temp file (avoids all string escaping issues)
+  const pythonScript = [
+    'import sys, os, soundfile as sf',
+    'from kokoro import KPipeline',
+    '',
+    'text_file = os.environ.get("KOKORO_TEXT_FILE")',
+    'voice = os.environ.get("KOKORO_VOICE", "af_heart")',
+    'output = os.environ.get("KOKORO_OUTPUT")',
+    '',
+    'with open(text_file, "r", encoding="utf-8") as f:',
+    '    text = f.read()',
+    '',
+    'pipeline = KPipeline(lang_code="a")',
+    'generator = pipeline(text, voice=voice, speed=1.0)',
+    '',
+    'for i, (gs, ps, audio) in enumerate(generator):',
+    '    sf.write(output, audio, 24000)',
+    '    break',
+    '',
+    'print("KOKORO_SUCCESS")',
+  ].join('\n');
+
+  fs.writeFileSync(tempScriptFile, pythonScript, 'utf-8');
+
   return new Promise((resolve, reject) => {
-    const pythonScript = `
-import sys, os, soundfile as sf
-
-try:
-    from kokoro import KPipeline
-
-    text_file = os.environ.get('KOKORO_TEXT_FILE')
-    voice = os.environ.get('KOKORO_VOICE', 'af_heart')
-    output = os.environ.get('KOKORO_OUTPUT')
-
-    with open(text_file, 'r', encoding='utf-8') as f:
-        text = f.read()
-
-    pipeline = KPipeline(lang_code='a')
-    generator = pipeline(text, voice=voice, speed=1.0, split_pattern=r'\n+')
-
-    for i, (gs, ps, audio) in enumerate(generator):
-        sf.write(output, audio, 24000)
-        break
-
-    print("KOKORO_SUCCESS")
-except Exception as e:
-    print(f"KOKORO_ERROR: {e}", file=sys.stderr)
-    sys.exit(1)
-`;
-
-    const python = spawn('python3', ['-c', pythonScript], {
+    const python = spawn('python3', [tempScriptFile], {
       env: {
         ...process.env,
         KOKORO_TEXT_FILE: tempTextFile,
@@ -151,8 +150,9 @@ except Exception as e:
     python.stderr.on('data', (data) => { stderr += data.toString(); console.log('[kokoro]', data.toString().trim()); });
 
     python.on('close', (code) => {
-      // Cleanup temp text file
+      // Cleanup temp files
       try { if (fs.existsSync(tempTextFile)) fs.unlinkSync(tempTextFile); } catch {}
+      try { if (fs.existsSync(tempScriptFile)) fs.unlinkSync(tempScriptFile); } catch {}
 
       if (code === 0 && stdout.includes('KOKORO_SUCCESS')) {
         resolve();
@@ -354,8 +354,8 @@ app.post('/render', async (req, res) => {
   }
 });
 
-app.get('/health', (_, res) => res.json({ status: 'ok', version: '6.2' }));
-app.get('/', (_, res) => res.json({ service: 'SmartRemoteGigs Video + Kokoro TTS', version: '6.2' }));
+app.get('/health', (_, res) => res.json({ status: 'ok', version: '6.3' }));
+app.get('/', (_, res) => res.json({ service: 'SmartRemoteGigs Video + Kokoro TTS', version: '6.3' }));
 
 // ── Start server ────────────────────────────────────────────────────────────
 app.listen(PORT, async () => {
