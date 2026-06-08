@@ -37,7 +37,7 @@ const BG_MUSIC_FILES = [
 // ── Verify Kokoro at startup ──────────────────────────────────────────────
 async function verifyKokoro() {
   try {
-    await execAsync('python3 -c "from kokoro import KPipeline; print('OK')"');
+    await execAsync("python3 -c "from kokoro import KPipeline; print('OK')"");
     console.log('[startup] ✅ Kokoro TTS is ready');
     return true;
   } catch (e) {
@@ -319,8 +319,8 @@ app.post('/render', async (req, res) => {
   }
 });
 
-app.get('/health', (_, res) => res.json({ status: 'ok', version: '6.8' }));
-app.get('/', (_, res) => res.json({ service: 'SmartRemoteGigs Video + Kokoro TTS', version: '6.8' }));
+app.get('/health', (_, res) => res.json({ status: 'ok', version: '6.9' }));
+app.get('/', (_, res) => res.json({ service: 'SmartRemoteGigs Video + Kokoro TTS', version: '6.9' }));
 
 // ── Start server ────────────────────────────────────────────────────────────
 app.listen(PORT, async () => {
