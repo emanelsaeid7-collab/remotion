@@ -113,9 +113,21 @@ app.post('/render', async (req, res) => {
   let hasAudio = false;
   let audioDurationSec = 0;
 
+  // ✅ DIAGNOSTIC: Log audio data received
+  console.log('=== AUDIO DIAGNOSTIC ===');
+  console.log('audio object keys:', Object.keys(audio || {}));
+  console.log('audio.base64 exists:', !!audio?.base64);
+  console.log('audio.base64 length:', audio?.base64?.length || 0);
+  console.log('audio.base64 first 100 chars:', audio?.base64?.substring(0, 100) || 'EMPTY');
+  console.log('audio.format:', audio?.format || 'not specified');
+
   if (audio?.base64 && audio.base64.length > 100) {
     try {
-      fs.writeFileSync(audioFile, Buffer.from(audio.base64, 'base64'));
+      // Write base64 to MP3 file
+      const audioBuffer = Buffer.from(audio.base64, 'base64');
+      console.log('audioBuffer size:', audioBuffer.length, 'bytes');
+
+      fs.writeFileSync(audioFile, audioBuffer);
       const stats = fs.statSync(audioFile);
       hasAudio = true;
       console.log(`[audio] ✅ Saved — ${stats.size} bytes`);
@@ -123,8 +135,11 @@ app.post('/render', async (req, res) => {
       audioDurationSec = await getAudioDuration(audioFile);
       console.log(`[audio] ⏱️  Actual duration: ${audioDurationSec}s`);
     } catch (e) {
-      console.error(`[audio] ❌`, e.message);
+      console.error(`[audio] ❌ Error saving audio:`, e.message);
+      hasAudio = false;
     }
+  } else {
+    console.log(`[audio] ⚠️  No valid audio base64 received (length: ${audio?.base64?.length || 0})`);
   }
 
   // ── 3. Adjust sceneTimings to match ACTUAL audio duration ─────────────────
@@ -163,9 +178,8 @@ app.post('/render', async (req, res) => {
   finalVideoData.audioDuration = audioDurationSec;
   finalVideoData.totalDurationFrames = totalFrames;
   finalVideoData.ctaDurFrames = Math.ceil(5 * FPS);
-  // ✅ Pass logo as base64 data URI — works in any browser environment
   finalVideoData.logoBase64 = logoBase64;
-  finalVideoData.voiceId = voice_id || 'XN5MUfNpmfCV6rvigVhs';
+  finalVideoData.voiceId = voice_id || 'cgSgspJ2msm6clMCkdW9';
 
   console.log('[props] logoBase64:', logoBase64 ? `✅ ${logoBase64.length} chars` : '❌ null');
   console.log('[props] keys:', Object.keys(finalVideoData));
@@ -193,7 +207,11 @@ app.post('/render', async (req, res) => {
 
     // ── 6. Merge with FFmpeg ──────────────────────────────────────────────
     if (hasAudio) {
-      console.log(`[ffmpeg] ▶ Merging...`);
+      console.log(`[ffmpeg] ▶ Merging audio + video...`);
+      console.log(`[ffmpeg] silentVideo: ${silentVideo}`);
+      console.log(`[ffmpeg] audioFile: ${audioFile}`);
+      console.log(`[ffmpeg] finalVideo: ${finalVideo}`);
+
       const ffmpegCmd = [
         'ffmpeg -y',
         `-i "${silentVideo}"`,
@@ -206,13 +224,17 @@ app.post('/render', async (req, res) => {
         `"${finalVideo}"`,
       ].join(' ');
 
-      await execAsync(ffmpegCmd, { timeout: 5 * 60 * 1000 });
+      console.log(`[ffmpeg] command: ${ffmpegCmd}`);
+
+      const { stdout, stderr } = await execAsync(ffmpegCmd, { timeout: 5 * 60 * 1000 });
+      if (stderr) console.log('[ffmpeg] stderr:', stderr.substring(0, 500));
+
       fs.unlinkSync(silentVideo);
       fs.unlinkSync(audioFile);
       console.log(`[ffmpeg] ✅ Merge done`);
     } else {
+      console.log(`[render] ⚠️  No audio — renaming silent video`);
       fs.renameSync(silentVideo, finalVideo);
-      console.log(`[render] ✅ No audio — video only`);
     }
 
     const videoUrl = `${baseUrl}/videos/${videoType}_${timestamp}.mp4`;
@@ -224,6 +246,7 @@ app.post('/render', async (req, res) => {
       videoType, 
       durationSec: audioSec,
       audioDuration: audioDurationSec,
+      hasAudio: hasAudio,
       voiceUsed: finalVideoData.voiceId,
     });
 
@@ -236,8 +259,8 @@ app.post('/render', async (req, res) => {
   }
 });
 
-app.get('/health', (_, res) => res.json({ status: 'ok', version: '3.5' }));
-app.get('/', (_, res) => res.json({ service: 'Remotion + FFmpeg + SmartRemoteGigs', version: '3.5' }));
+app.get('/health', (_, res) => res.json({ status: 'ok', version: '3.6' }));
+app.get('/', (_, res) => res.json({ service: 'Remotion + FFmpeg + SmartRemoteGigs', version: '3.6' }));
 
 app.listen(PORT, () => {
   console.log(`🎬 SmartRemoteGigs Video Server → http://localhost:${PORT}`);
