@@ -34,32 +34,17 @@ const BG_MUSIC_FILES = [
   path.join(ASSETS_DIR, 'bg-music-3.mp3'),
 ];
 
-const VENV_PATH = '/opt/venv';
-const VENV_PYTHON = path.join(VENV_PATH, 'bin', 'python3');
+// ✅ Venv Python path (installed during Docker build)
+const VENV_PYTHON = '/opt/venv/bin/python3';
 
-// ── Setup Kokoro TTS with venv ────────────────────────────────────────────
-async function setupKokoroTTS() {
+// ── Verify Kokoro at startup ──────────────────────────────────────────────
+async function verifyKokoro() {
   try {
-    // Check if venv exists
-    if (!fs.existsSync(VENV_PYTHON)) {
-      console.log('[startup] 🔄 Creating Python venv...');
-      await execAsync('python3 -m venv /opt/venv');
-      console.log('[startup] ✅ Venv created');
-    }
-
-    // Check if kokoro is installed in venv
-    try {
-      await execAsync(`${VENV_PYTHON} -c "from kokoro import KPipeline"`);
-      console.log('[startup] ✅ Kokoro TTS is installed in venv');
-      return true;
-    } catch (e) {
-      console.log('[startup] 🔄 Installing Kokoro TTS in venv...');
-      await execAsync(`${VENV_PYTHON} -m pip install kokoro-onnx soundfile`);
-      console.log('[startup] ✅ Kokoro TTS installed in venv');
-      return true;
-    }
+    await execAsync(`${VENV_PYTHON} -c "from kokoro import KPipeline; print('OK')"`);
+    console.log('[startup] ✅ Kokoro TTS is ready');
+    return true;
   } catch (e) {
-    console.error('[startup] ❌ Failed to setup Kokoro:', e.message);
+    console.error('[startup] ❌ Kokoro not available:', e.message);
     return false;
   }
 }
@@ -337,11 +322,11 @@ app.post('/render', async (req, res) => {
   }
 });
 
-app.get('/health', (_, res) => res.json({ status: 'ok', version: '6.5' }));
-app.get('/', (_, res) => res.json({ service: 'SmartRemoteGigs Video + Kokoro TTS', version: '6.5' }));
+app.get('/health', (_, res) => res.json({ status: 'ok', version: '6.6' }));
+app.get('/', (_, res) => res.json({ service: 'SmartRemoteGigs Video + Kokoro TTS', version: '6.6' }));
 
 // ── Start server ────────────────────────────────────────────────────────────
 app.listen(PORT, async () => {
   console.log(`🎬 SmartRemoteGigs Video Server → http://localhost:${PORT}`);
-  await setupKokoroTTS();
+  await verifyKokoro();
 });
