@@ -1,103 +1,269 @@
 import React from 'react';
-import { AbsoluteFill, Sequence, useCurrentFrame, useVideoConfig, interpolate, Easing, Img } from 'remotion';
+import { AbsoluteFill, Sequence, useCurrentFrame, useVideoConfig, interpolate, Easing } from 'remotion';
 import { CTASection } from './sections/CTASection';
-import { COLORS, FONTS, SHADOWS, VIDEO_TYPE_ICONS, VIDEO_TYPE_LABELS, VIDEO_TYPE_GRADIENTS } from './styles';
+import { COLORS, FONTS, SHADOWS, VIDEO_TYPE_GRADIENTS, VIDEO_TYPE_ICONS, VIDEO_TYPE_LABELS } from './styles';
 
 const FPS = 30;
 
-// ── Glass Card Component ────────────────────────────────────────────────────
-const GlassCard = ({ children, style, accent }) => (
+// ── Animated Gradient Background ────────────────────────────────────────────
+const AnimatedGradient = ({ colors }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  const t = (frame % (fps * 8)) / (fps * 8); // 8-second cycle
+  const angle = 135 + Math.sin(t * Math.PI * 2) * 45;
+  const scale = 1 + Math.sin(t * Math.PI * 2) * 0.15;
+  const opacity = 0.15 + Math.sin(t * Math.PI * 2) * 0.05;
+
+  return (
+    <div style={{
+      position: 'absolute',
+      inset: -100,
+      background: `linear-gradient(${angle}deg, ${colors[0]}40, ${colors[1]}30, ${COLORS.bg} 70%)`,
+      transform: `scale(${scale})`,
+      opacity,
+      filter: 'blur(60px)',
+      zIndex: 0,
+    }} />
+  );
+};
+
+// ── Floating Orbs ───────────────────────────────────────────────────────────
+const FloatingOrbs = ({ color }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  return (
+    <>
+      {[0, 1, 2].map((i) => {
+        const t = ((frame + i * 120) % (fps * 12)) / (fps * 12);
+        const x = 20 + Math.sin(t * Math.PI * 2 + i * 2) * 30;
+        const y = 20 + Math.cos(t * Math.PI * 2 + i * 3) * 25;
+        const size = 200 + i * 100;
+
+        return (
+          <div key={i} style={{
+            position: 'absolute',
+            left: `${x}%`,
+            top: `${y}%`,
+            width: size,
+            height: size,
+            borderRadius: '50%',
+            background: `radial-gradient(circle, ${color}${15 + i * 5} 0%, transparent 70%)`,
+            filter: 'blur(40px)',
+            zIndex: 1,
+            transform: `translate(-50%, -50%)`,
+          }} />
+        );
+      })}
+    </>
+  );
+};
+
+// ── Grid Lines ──────────────────────────────────────────────────────────────
+const GridLines = () => (
   <div style={{
-    background: `linear-gradient(135deg, ${COLORS.bgGlass}, rgba(255,255,255,0.02))`,
-    backdropFilter: 'blur(20px)',
-    WebkitBackdropFilter: 'blur(20px)',
+    position: 'absolute',
+    inset: 0,
+    backgroundImage: `
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)
+    `,
+    backgroundSize: '60px 60px',
+    zIndex: 1,
+  }} />
+);
+
+// ── Step Badge ───────────────────────────────────────────────────────────────
+const StepBadge = ({ current, total, color }) => {
+  const frame = useCurrentFrame();
+  const scale = interpolate(frame, [0, 15], [0.6, 1], { extrapolateRight: 'clamp', easing: Easing.out(Easing.back(1.7)) });
+
+  return (
+    <div style={{
+      transform: `scale(${scale})`,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 12,
+      zIndex: 10,
+    }}>
+      <div style={{
+        width: 56, height: 56, borderRadius: 16,
+        background: `linear-gradient(135deg, ${color}, ${COLORS.secondary})`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 24, fontWeight: 800, color: COLORS.text,
+        boxShadow: `0 8px 24px ${color}50`,
+        fontFamily: FONTS.heading,
+      }}>
+        {current + 1}
+      </div>
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: 2,
+      }}>
+        <span style={{
+          fontFamily: FONTS.heading, fontSize: 13, fontWeight: 700,
+          color: COLORS.textMuted, letterSpacing: 2, textTransform: 'uppercase',
+        }}>
+          Step {current + 1} of {total}
+        </span>
+        <div style={{
+          width: 80, height: 4, borderRadius: 2,
+          background: 'rgba(255,255,255,0.08)',
+          overflow: 'hidden',
+        }}>
+          <div style={{
+            width: `${((current + 1) / total) * 100}%`,
+            height: '100%',
+            background: `linear-gradient(90deg, ${color}, ${COLORS.secondary})`,
+            borderRadius: 2,
+            transition: 'width 0.3s ease',
+          }} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Content Card ────────────────────────────────────────────────────────────
+const ContentCard = ({ children, color }) => (
+  <div style={{
+    background: `linear-gradient(135deg, ${COLORS.bgCard}, rgba(255,255,255,0.01))`,
+    backdropFilter: 'blur(24px)',
+    WebkitBackdropFilter: 'blur(24px)',
     border: `1px solid ${COLORS.border}`,
-    borderRadius: 28,
-    padding: '48px 40px',
-    maxWidth: 920,
+    borderRadius: 32,
+    padding: '52px 44px',
+    maxWidth: 900,
     width: '100%',
     boxShadow: SHADOWS.card,
     position: 'relative',
     overflow: 'hidden',
-    ...style,
+    zIndex: 10,
   }}>
-    {/* Top glow line */}
+    {/* Glow line top */}
     <div style={{
       position: 'absolute',
-      top: 0, left: 24, right: 24,
-      height: 2,
-      background: `linear-gradient(90deg, transparent, ${accent}, transparent)`,
-      borderRadius: 2,
-      opacity: 0.6,
+      top: 0, left: 40, right: 40,
+      height: 3,
+      background: `linear-gradient(90deg, transparent, ${color}, transparent)`,
+      borderRadius: 3,
+      opacity: 0.5,
     }} />
     {children}
   </div>
 );
 
-// ── Step Indicator Pill ─────────────────────────────────────────────────────
-const StepPill = ({ current, total, accent }) => {
+// ── Scene Slide ─────────────────────────────────────────────────────────────
+const SceneSlide = ({ scene, index, total, videoType }) => {
   const frame = useCurrentFrame();
-  const scale = interpolate(frame, [0, 12], [0.8, 1], { extrapolateRight: 'clamp', easing: Easing.out(Easing.back(1.7)) });
+  const { fps } = useVideoConfig();
+
+  const fadeIn = interpolate(frame, [0, 14], [0, 1], { extrapolateRight: 'clamp', easing: Easing.out(Easing.cubic) });
+  const slideUp = interpolate(frame, [0, 14], [80, 0], { extrapolateRight: 'clamp', easing: Easing.out(Easing.cubic) });
+  const scaleIn = interpolate(frame, [0, 14], [0.85, 1], { extrapolateRight: 'clamp', easing: Easing.out(Easing.back(1.5)) });
+
+  const gradient = VIDEO_TYPE_GRADIENTS[videoType] || VIDEO_TYPE_GRADIENTS.default;
+  const color = gradient[0];
 
   return (
-    <div style={{
-      transform: `scale(${scale})`,
-      background: `linear-gradient(135deg, ${accent}20, ${COLORS.primary}15)`,
-      border: `1.5px solid ${accent}40`,
-      padding: '12px 32px',
-      borderRadius: 100,
-      display: 'flex',
+    <AbsoluteFill style={{
+      backgroundColor: COLORS.bg,
+      justifyContent: 'center',
       alignItems: 'center',
-      gap: 14,
-      zIndex: 10,
-      boxShadow: `0 0 20px ${accent}20`,
+      padding: '140px 48px 160px',
+      flexDirection: 'column',
+      gap: 44,
+      fontFamily: FONTS.body,
     }}>
-      {/* Dots */}
-      <div style={{ display: 'flex', gap: 6 }}>
-        {Array.from({ length: total }).map((_, i) => (
-          <div key={i} style={{
-            width: 8, height: 8, borderRadius: '50%',
-            backgroundColor: i === current ? accent : COLORS.textDim,
-            transition: 'all 0.3s ease',
-            boxShadow: i === current ? `0 0 8px ${accent}` : 'none',
-          }} />
-        ))}
-      </div>
-      <span style={{
-        fontFamily: FONTS.heading, fontSize: 15, fontWeight: 700,
-        color: accent, letterSpacing: 2, textTransform: 'uppercase',
-      }}>
-        Step {current + 1} of {total}
-      </span>
-    </div>
-  );
-};
+      <AnimatedGradient colors={gradient} />
+      <FloatingOrbs color={color} />
+      <GridLines />
 
-// ── Progress Bar ────────────────────────────────────────────────────────────
-const ProgressBar = ({ currentScene, totalScenes, accent }) => {
-  const progress = ((currentScene + 1) / totalScenes) * 100;
-  return (
-    <div style={{
-      position: 'absolute',
-      bottom: 50,
-      left: '50%',
-      transform: 'translateX(-50%)',
-      width: '75%',
-      height: 4,
-      backgroundColor: 'rgba(255,255,255,0.06)',
-      borderRadius: 100,
-      overflow: 'hidden',
-      zIndex: 50,
-    }}>
       <div style={{
-        width: `${progress}%`,
-        height: '100%',
-        background: `linear-gradient(90deg, ${accent}, ${COLORS.secondary})`,
-        borderRadius: 100,
-        boxShadow: `0 0 12px ${accent}50`,
-        transition: 'width 0.3s ease',
-      }} />
-    </div>
+        opacity: fadeIn,
+        transform: `translateY(${slideUp}px) scale(${scaleIn})`,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 44,
+        zIndex: 10,
+        width: '100%',
+        maxWidth: 920,
+      }}>
+        <StepBadge current={index} total={total} color={color} />
+
+        <ContentCard color={color}>
+          <h2 style={{
+            margin: 0,
+            fontSize: 56,
+            fontWeight: 800,
+            color: COLORS.text,
+            lineHeight: 1.2,
+            textAlign: 'center',
+            fontFamily: FONTS.heading,
+            letterSpacing: -1,
+            textShadow: `0 4px 30px ${color}30`,
+          }}>
+            {scene.title || scene.text || ''}
+          </h2>
+
+          {scene.detail && (
+            <p style={{
+              margin: '32px 0 0',
+              fontSize: 26,
+              color: COLORS.textMuted,
+              textAlign: 'center',
+              lineHeight: 1.6,
+              fontWeight: 400,
+            }}>
+              {scene.detail}
+            </p>
+          )}
+
+          {scene.searchTerms && Array.isArray(scene.searchTerms) && scene.searchTerms.length > 0 && (
+            <div style={{
+              marginTop: 40,
+              display: 'flex',
+              gap: 12,
+              flexWrap: 'wrap',
+              justifyContent: 'center',
+            }}>
+              {scene.searchTerms.map((tag, i) => (
+                <span key={i} style={{
+                  fontSize: 15,
+                  color: color,
+                  background: `${color}12`,
+                  border: `1.5px solid ${color}30`,
+                  padding: '10px 20px',
+                  borderRadius: 100,
+                  fontWeight: 600,
+                  fontFamily: FONTS.heading,
+                  boxShadow: `0 0 12px ${color}15`,
+                }}>
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+        </ContentCard>
+
+        <div style={{
+          opacity: fadeIn * 0.5,
+          fontSize: 15,
+          color: COLORS.textDim,
+          fontWeight: 500,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          letterSpacing: 0.5,
+        }}>
+          <span style={{ fontSize: 18 }}>🚀</span>
+          <span>SmartRemoteGigs</span>
+          <span style={{ color: COLORS.textDim }}>•</span>
+          <span>Work Smarter</span>
+        </div>
+      </div>
+    </AbsoluteFill>
   );
 };
 
@@ -137,137 +303,7 @@ const TypeBadge = ({ videoType }) => {
   );
 };
 
-// ── Scene Slide ───────────────────────────────────────────────────────────────
-const SceneSlide = ({ scene, index, total, videoType }) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-
-  const fadeIn = interpolate(frame, [0, 12], [0, 1], { extrapolateRight: 'clamp', easing: Easing.out(Easing.cubic) });
-  const slideUp = interpolate(frame, [0, 12], [60, 0], { extrapolateRight: 'clamp', easing: Easing.out(Easing.cubic) });
-  const scaleIn = interpolate(frame, [0, 12], [0.88, 1], { extrapolateRight: 'clamp', easing: Easing.out(Easing.back(1.5)) });
-
-  const float = interpolate(frame, [0, fps * 2], [0, -8], { extrapolateRight: 'extend' });
-  const floatCycle = Math.sin(float / 10) * 6;
-
-  const gradient = VIDEO_TYPE_GRADIENTS[videoType] || VIDEO_TYPE_GRADIENTS.default;
-  const accent = gradient[0];
-
-  return (
-    <AbsoluteFill style={{
-      backgroundColor: COLORS.bg,
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: '120px 50px 140px',
-      flexDirection: 'column',
-      gap: 40,
-      fontFamily: FONTS.body,
-    }}>
-      {/* Ambient glow */}
-      <div style={{
-        position: 'absolute',
-        top: '12%',
-        left: '50%',
-        transform: `translateX(-50%) translateY(${floatCycle}px)`,
-        width: 700,
-        height: 600,
-        borderRadius: '50%',
-        background: `radial-gradient(circle, ${accent}10 0%, ${COLORS.primary}06 40%, transparent 70%)`,
-        filter: 'blur(80px)',
-        zIndex: 1,
-      }} />
-
-      {/* Subtle grid */}
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.03) 1px, transparent 0)`,
-        backgroundSize: '50px 50px',
-        zIndex: 1,
-      }} />
-
-      {/* Step pill */}
-      <StepPill current={index} total={total} accent={accent} />
-
-      {/* Content card */}
-      <GlassCard accent={accent}>
-        <h2 style={{
-          margin: 0,
-          fontSize: 52,
-          fontWeight: 800,
-          color: COLORS.text,
-          lineHeight: 1.25,
-          textAlign: 'center',
-          fontFamily: FONTS.heading,
-          letterSpacing: -0.5,
-          textShadow: `0 2px 20px ${accent}20`,
-        }}>
-          {scene.title || scene.text || ''}
-        </h2>
-
-        {scene.detail && (
-          <p style={{
-            margin: '28px 0 0',
-            fontSize: 24,
-            color: COLORS.textMuted,
-            textAlign: 'center',
-            lineHeight: 1.6,
-            fontWeight: 400,
-          }}>
-            {scene.detail}
-          </p>
-        )}
-
-        {scene.searchTerms && Array.isArray(scene.searchTerms) && scene.searchTerms.length > 0 && (
-          <div style={{
-            marginTop: 36,
-            display: 'flex',
-            gap: 10,
-            flexWrap: 'wrap',
-            justifyContent: 'center',
-          }}>
-            {scene.searchTerms.map((tag, i) => (
-              <span key={i} style={{
-                fontSize: 14,
-                color: accent,
-                background: `${accent}12`,
-                border: `1px solid ${accent}25`,
-                padding: '8px 18px',
-                borderRadius: 100,
-                fontWeight: 600,
-                fontFamily: FONTS.heading,
-                boxShadow: `0 0 8px ${accent}10`,
-              }}>
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
-      </GlassCard>
-
-      {/* Footer brand */}
-      <div style={{
-        opacity: fadeIn * 0.6,
-        fontSize: 15,
-        color: COLORS.textDim,
-        fontWeight: 500,
-        zIndex: 10,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        letterSpacing: 0.5,
-      }}>
-        <span>🚀</span>
-        <span>SmartRemoteGigs</span>
-        <span style={{ color: COLORS.textDim }}>•</span>
-        <span>Work Smarter</span>
-      </div>
-
-      <ProgressBar currentScene={index} totalScenes={total} accent={accent} />
-    </AbsoluteFill>
-  );
-};
-
-// ── Master Template ─────────────────────────────────────────────────────────
+// ── Master Template ───────────────────────────────────────────────────────
 export const MasterTemplate = ({ videoData }) => {
   const data = videoData || { videoType: 'fix', title: 'Example', solution: [] };
 
@@ -361,21 +397,10 @@ export const MasterTemplate = ({ videoData }) => {
 
 export const getTotalDuration = (data) => {
   if (!data) return 900;
-
   const ctaFrames = data.ctaDurFrames || 150;
-
   if (data.sceneTimings && data.sceneTimings.length > 0) {
     const lastTiming = data.sceneTimings[data.sceneTimings.length - 1];
-    const scenesDurationFrames = Math.round(lastTiming.end * FPS);
-    return scenesDurationFrames + ctaFrames;
+    return Math.round(lastTiming.end * FPS) + ctaFrames;
   }
-
-  const steps = data.steps || [];
-  switch (data.videoType) {
-    case 'workflow':
-    case 'automation':
-      return (steps.length + 1) * 150 + 150;
-    default:
-      return data.totalDurationFrames || 900;
-  }
+  return data.totalDurationFrames || 900;
 };
