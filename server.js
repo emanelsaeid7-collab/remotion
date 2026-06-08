@@ -34,22 +34,33 @@ const BG_MUSIC_FILES = [
   path.join(ASSETS_DIR, 'bg-music-3.mp3'),
 ];
 
-// ── Auto-install Kokoro TTS if missing ──────────────────────────────────────
-async function ensureKokoroInstalled() {
+const VENV_PATH = '/opt/venv';
+const VENV_PYTHON = path.join(VENV_PATH, 'bin', 'python3');
+
+// ── Setup Kokoro TTS with venv ────────────────────────────────────────────
+async function setupKokoroTTS() {
   try {
-    await execAsync('python3 -c "from kokoro import KPipeline"');
-    console.log('[startup] ✅ Kokoro TTS is installed');
-    return true;
-  } catch (e) {
-    console.log('[startup] 🔄 Kokoro TTS not found, installing...');
-    try {
-      await execAsync('python3 -m pip install --break-system-packages kokoro-onnx soundfile 2>/dev/null || pip install kokoro-onnx soundfile');
-      console.log('[startup] ✅ Kokoro TTS installed successfully');
-      return true;
-    } catch (installError) {
-      console.error('[startup] ❌ Failed to install Kokoro:', installError.message);
-      return false;
+    // Check if venv exists
+    if (!fs.existsSync(VENV_PYTHON)) {
+      console.log('[startup] 🔄 Creating Python venv...');
+      await execAsync('python3 -m venv /opt/venv');
+      console.log('[startup] ✅ Venv created');
     }
+
+    // Check if kokoro is installed in venv
+    try {
+      await execAsync(`${VENV_PYTHON} -c "from kokoro import KPipeline"`);
+      console.log('[startup] ✅ Kokoro TTS is installed in venv');
+      return true;
+    } catch (e) {
+      console.log('[startup] 🔄 Installing Kokoro TTS in venv...');
+      await execAsync(`${VENV_PYTHON} -m pip install kokoro-onnx soundfile`);
+      console.log('[startup] ✅ Kokoro TTS installed in venv');
+      return true;
+    }
+  } catch (e) {
+    console.error('[startup] ❌ Failed to setup Kokoro:', e.message);
+    return false;
   }
 }
 
@@ -101,40 +112,14 @@ async function getAudioDuration(filePath) {
 }
 
 // ── Helper: Generate speech with Kokoro TTS ────────────────────────────────
-// ✅ FIXED: Write Python script to temp file instead of -c
 async function generateKokoroSpeech(text, voiceId, outputPath) {
   const tempTextFile = path.join(OUTPUT_DIR, `kokoro_text_${Date.now()}.txt`);
-  const tempScriptFile = path.join(OUTPUT_DIR, `kokoro_script_${Date.now()}.py`);
-
-  // Write text to temp file
   fs.writeFileSync(tempTextFile, text, 'utf-8');
 
-  // Write Python script to temp file (avoids all string escaping issues)
-  const pythonScript = [
-    'import sys, os, soundfile as sf',
-    'from kokoro import KPipeline',
-    '',
-    'text_file = os.environ.get("KOKORO_TEXT_FILE")',
-    'voice = os.environ.get("KOKORO_VOICE", "af_heart")',
-    'output = os.environ.get("KOKORO_OUTPUT")',
-    '',
-    'with open(text_file, "r", encoding="utf-8") as f:',
-    '    text = f.read()',
-    '',
-    'pipeline = KPipeline(lang_code="a")',
-    'generator = pipeline(text, voice=voice, speed=1.0)',
-    '',
-    'for i, (gs, ps, audio) in enumerate(generator):',
-    '    sf.write(output, audio, 24000)',
-    '    break',
-    '',
-    'print("KOKORO_SUCCESS")',
-  ].join('\n');
-
-  fs.writeFileSync(tempScriptFile, pythonScript, 'utf-8');
+  const scriptPath = path.join(__dirname, 'kokoro_tts.py');
 
   return new Promise((resolve, reject) => {
-    const python = spawn('python3', [tempScriptFile], {
+    const python = spawn(VENV_PYTHON, [scriptPath], {
       env: {
         ...process.env,
         KOKORO_TEXT_FILE: tempTextFile,
@@ -150,9 +135,7 @@ async function generateKokoroSpeech(text, voiceId, outputPath) {
     python.stderr.on('data', (data) => { stderr += data.toString(); console.log('[kokoro]', data.toString().trim()); });
 
     python.on('close', (code) => {
-      // Cleanup temp files
       try { if (fs.existsSync(tempTextFile)) fs.unlinkSync(tempTextFile); } catch {}
-      try { if (fs.existsSync(tempScriptFile)) fs.unlinkSync(tempScriptFile); } catch {}
 
       if (code === 0 && stdout.includes('KOKORO_SUCCESS')) {
         resolve();
@@ -354,11 +337,11 @@ app.post('/render', async (req, res) => {
   }
 });
 
-app.get('/health', (_, res) => res.json({ status: 'ok', version: '6.3' }));
-app.get('/', (_, res) => res.json({ service: 'SmartRemoteGigs Video + Kokoro TTS', version: '6.3' }));
+app.get('/health', (_, res) => res.json({ status: 'ok', version: '6.5' }));
+app.get('/', (_, res) => res.json({ service: 'SmartRemoteGigs Video + Kokoro TTS', version: '6.5' }));
 
 // ── Start server ────────────────────────────────────────────────────────────
 app.listen(PORT, async () => {
   console.log(`🎬 SmartRemoteGigs Video Server → http://localhost:${PORT}`);
-  await ensureKokoroInstalled();
+  await setupKokoroTTS();
 });
