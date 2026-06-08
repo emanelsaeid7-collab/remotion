@@ -9,10 +9,10 @@ export const CTASection = ({ data }) => {
   const logoBase64 = data?.logoBase64 || null;
 
   const bgOpacity = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
-  const contentY = interpolate(frame, [5, 22], [100, 0], { extrapolateRight: 'clamp', easing: Easing.out(Easing.cubic) });
-  const contentOpacity = interpolate(frame, [5, 22], [0, 1], { extrapolateRight: 'clamp' });
-  const buttonScale = interpolate(frame, [18, 30], [0.6, 1], { extrapolateRight: 'clamp', easing: Easing.out(Easing.back(1.7)) });
-  const logoScale = interpolate(frame, [0, 18], [0.4, 1], { extrapolateRight: 'clamp', easing: Easing.out(Easing.back(1.5)) });
+  const contentY = interpolate(frame, [5, 20], [60, 0], { extrapolateRight: 'clamp', easing: Easing.out(Easing.cubic) });
+  const contentOpacity = interpolate(frame, [5, 20], [0, 1], { extrapolateRight: 'clamp' });
+  const buttonScale = interpolate(frame, [15, 25], [0.8, 1], { extrapolateRight: 'clamp', easing: Easing.out(Easing.back(1.7)) });
+  const logoScale = interpolate(frame, [0, 15], [0.5, 1], { extrapolateRight: 'clamp', easing: Easing.out(Easing.back(1.5)) });
 
   return (
     <AbsoluteFill style={{
@@ -20,75 +20,49 @@ export const CTASection = ({ data }) => {
       justifyContent: 'center',
       alignItems: 'center',
       flexDirection: 'column',
-      gap: 40,
+      gap: 32,
       fontFamily: FONTS.body,
-      padding: '100px 50px',
+      padding: '60px',
     }}>
-      {/* Animated gradient background */}
+      {/* Background glow */}
       <div style={{
         position: 'absolute',
-        inset: -100,
-        background: `radial-gradient(circle at 50% 50%, ${gradient[0]}20 0%, ${gradient[1]}10 40%, ${COLORS.bg} 80%)`,
+        top: '20%',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        width: 700,
+        height: 500,
+        borderRadius: '50%',
+        background: `radial-gradient(circle, ${gradient[0]}18 0%, ${gradient[1]}10 50%, transparent 70%)`,
         filter: 'blur(80px)',
         opacity: bgOpacity,
-        zIndex: 0,
       }} />
 
-      {/* Floating orbs */}
-      {[0, 1].map((i) => {
-        const t = ((frame + i * 200) % (30 * 10)) / (30 * 10);
-        return (
-          <div key={i} style={{
-            position: 'absolute',
-            left: `${20 + Math.sin(t * Math.PI * 2 + i * 3) * 30}%`,
-            top: `${20 + Math.cos(t * Math.PI * 2 + i * 2) * 20}%`,
-            width: 300 + i * 200,
-            height: 300 + i * 200,
-            borderRadius: '50%',
-            background: `radial-gradient(circle, ${gradient[i % 2]}${15 + i * 10} 0%, transparent 70%)`,
-            filter: 'blur(50px)',
-            zIndex: 1,
-            transform: 'translate(-50%, -50%)',
-          }} />
-        );
-      })}
-
-      {/* Grid */}
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.02) 1px, transparent 0)`,
-        backgroundSize: '50px 50px',
-        zIndex: 1,
-      }} />
-
-      {/* Logo */}
+      {/* Logo + Brand */}
       <div style={{
         opacity: contentOpacity,
         transform: `translateY(${contentY}px) scale(${logoScale})`,
         zIndex: 10,
         display: 'flex',
-        flexDirection: 'column',
         alignItems: 'center',
         gap: 20,
       }}>
         {logoBase64 ? (
           <Img src={logoBase64} style={{
-            width: 110, height: 110, borderRadius: 28, objectFit: 'contain',
-            filter: `drop-shadow(0 16px 40px ${gradient[0]}60)`,
+            width: 72, height: 72, borderRadius: 20, objectFit: 'contain',
+            filter: `drop-shadow(0 8px 20px ${gradient[0]}40)`,
           }} />
         ) : (
           <div style={{
-            width: 110, height: 110, borderRadius: 28,
+            width: 72, height: 72, borderRadius: 20,
             background: `linear-gradient(135deg, ${gradient[0]}, ${gradient[1]})`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 52, boxShadow: SHADOWS.glow,
+            fontSize: 36, boxShadow: SHADOWS.md,
           }}>🚀</div>
         )}
         <span style={{
-          fontFamily: FONTS.heading, fontSize: 42, fontWeight: 800,
+          fontFamily: FONTS.heading, fontSize: 40, fontWeight: 800,
           color: COLORS.text, letterSpacing: -1,
-          textShadow: `0 0 60px ${gradient[0]}40`,
         }}>SmartRemoteGigs</span>
       </div>
 
@@ -101,23 +75,14 @@ export const CTASection = ({ data }) => {
         maxWidth: 800,
       }}>
         <h2 style={{
-          margin: 0,
-          fontSize: 58,
-          fontWeight: 800,
-          color: COLORS.text,
-          lineHeight: 1.15,
-          fontFamily: FONTS.heading,
-          letterSpacing: -1,
-          textShadow: `0 4px 30px ${gradient[0]}30`,
+          margin: 0, fontSize: 52, fontWeight: 800, color: COLORS.text,
+          lineHeight: 1.2, fontFamily: FONTS.heading, letterSpacing: -1,
         }}>
           {data?.ctaTitle || 'Work Smarter, Not Harder'}
         </h2>
         <p style={{
-          margin: '28px 0 0',
-          fontSize: 26,
-          color: COLORS.textMuted,
-          lineHeight: 1.5,
-          fontWeight: 400,
+          margin: '20px 0 0', fontSize: 24, color: COLORS.textMuted,
+          lineHeight: 1.5, fontWeight: 400,
         }}>
           {data?.ctaSubtitle || 'Join thousands of digital workers solving problems with AI & modern tools.'}
         </p>
@@ -127,25 +92,25 @@ export const CTASection = ({ data }) => {
       <div style={{
         opacity: contentOpacity,
         transform: `translateY(${contentY}px) scale(${buttonScale})`,
-        zIndex: 10,
+        zIndex: 10, marginTop: 16,
       }}>
         <div style={{
           background: `linear-gradient(135deg, ${gradient[0]}, ${gradient[1]})`,
           color: COLORS.white,
-          padding: '26px 60px',
-          borderRadius: 20,
-          fontSize: 26,
+          padding: '22px 52px',
+          borderRadius: 16,
+          fontSize: 24,
           fontWeight: 700,
           fontFamily: FONTS.heading,
-          boxShadow: SHADOWS.button,
+          boxShadow: `0 10px 30px ${gradient[0]}40, ${SHADOWS.md}`,
           letterSpacing: 0.5,
           display: 'flex',
           alignItems: 'center',
-          gap: 14,
+          gap: 12,
         }}>
           {logoBase64 && (
             <Img src={logoBase64} style={{
-              width: 36, height: 36, borderRadius: 10, objectFit: 'contain',
+              width: 32, height: 32, borderRadius: 8, objectFit: 'contain',
             }} />
           )}
           {data?.ctaText || '👉 Visit SmartRemoteGigs.com'}
@@ -157,19 +122,18 @@ export const CTASection = ({ data }) => {
         opacity: contentOpacity,
         transform: `translateY(${contentY}px)`,
         display: 'flex',
-        gap: 36,
-        marginTop: 16,
+        gap: 28,
+        marginTop: 24,
         zIndex: 10,
       }}>
         {['AI Tools', 'Productivity', 'Freelancing'].map((tag, i) => (
           <div key={i} style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            fontSize: 17, color: COLORS.textMuted, fontWeight: 600,
+            display: 'flex', alignItems: 'center', gap: 8,
+            fontSize: 16, color: COLORS.textMuted, fontWeight: 600,
           }}>
             <div style={{
               width: 8, height: 8, borderRadius: '50%',
               backgroundColor: COLORS.success,
-              boxShadow: `0 0 10px ${COLORS.success}60`,
             }} />
             {tag}
           </div>
